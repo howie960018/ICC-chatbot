@@ -1,37 +1,56 @@
 const { generateChatResponse } = require('./openaiService');
 const { getDialogueState } = require('./dialogueService');
+const { updatePractice } = require('../services/practiceService'); // 引入練習更新服務
 
-async function analyzeDialogue(res) {
+/**
+ * 分析對話並將結果保存到練習紀錄
+ * @param {String} practiceId 練習的 ID
+ * @returns {String} 分析結果
+ */
+async function analyzeDialogue(practiceId) {
+  // 獲取當前對話狀態
   const dialogueState = getDialogueState();
-  const conversationHistory = dialogueState.history.map(entry => 
-    `${entry.role}: ${entry.content}`
-  ).join('\n');
+  const conversationHistory = dialogueState.history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
 
-  let prompt = '';
-
-  if (dialogueState.technique === '我訊息') {
-    prompt = generateIMessagePrompt(conversationHistory);
-  } else if (dialogueState.technique === '三明治溝通法') {
-    prompt = generateSandwichPrompt(conversationHistory);
-  } else if (dialogueState.technique === '綜合溝通技巧') {
-    prompt = generateComprehensivePrompt(conversationHistory);
-  } else {
-    prompt = generateDefaultPrompt(conversationHistory);
-  }
+  // 生成分析提示
+  const prompt = generatePrompt(dialogueState.technique, conversationHistory);
 
   try {
-    const analysis = await generateChatResponse([{ 
-      role: "user", 
-      content: prompt 
-    }]);
-    
-    res.json({ analysis, completed: true });
+    // 通過 OpenAI API 獲取分析結果
+    const analysis = await generateChatResponse([{ role: "user", content: prompt }]);
+
+    // 保存分析結果到練習紀錄
+    await updatePractice(practiceId, { analysis });
+
+    return analysis;
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'An error occurred while analyzing the dialogue.' });
+    console.error('Error analyzing dialogue:', error);
+    throw error;
   }
 }
 
+/**
+ * 根據溝通技巧生成分析提示
+ * @param {String} technique 溝通技巧名稱
+ * @param {String} conversationHistory 對話歷史文本
+ * @returns {String} 生成的分析提示
+ */
+function generatePrompt(technique, conversationHistory) {
+  switch (technique) {
+    case '我訊息':
+      return generateIMessagePrompt(conversationHistory);
+    case '三明治溝通法':
+      return generateSandwichPrompt(conversationHistory);
+    case '綜合溝通技巧':
+      return generateComprehensivePrompt(conversationHistory);
+    default:
+      return generateDefaultPrompt(conversationHistory);
+  }
+}
+
+/**
+ * 我訊息的分析提示模板
+ */
 function generateIMessagePrompt(conversationHistory) {
   return ` 分析整段對話，針對導師的回應，用繁體中文分析是否正確使用了 我訊息 技巧(不用對家長給出分析建議)，給導師以下格式的分析，不用對家長給出分析建議，根據評量標準給予導師整段對話的表現等第、整體回饋與修正建議：
     

@@ -115,7 +115,7 @@ function displayPracticeDetails(practice) {
   
   // 更新練習列表，讓每個項目存放 ID
   async function loadPractices() {
-    const token = localStorage.getItem('token'); // 從本地獲取 Token
+    const token = localStorage.getItem('token');
     const response = await fetch('/api/practice/practices', {
         headers: { Authorization: `Bearer ${token}` }
     });
@@ -123,41 +123,46 @@ function displayPracticeDetails(practice) {
 
     if (data.success) {
         const practiceList = document.getElementById('practiceList');
-        practiceList.innerHTML = ''; // 清空舊列表
+        practiceList.innerHTML = '';
 
         data.practices.forEach(practice => {
             const listItem = document.createElement('li');
             listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleString()}`;
-            listItem.dataset.id = practice._id; // 儲存練習的 ID
+            
+            // 添加開始按鈕
+            const startButton = document.createElement('button');
+            startButton.textContent = '選擇';  // 改名為"選擇"更符合實際功能
+            startButton.onclick = () => {
+                currentPracticeId = practice._id;  // 設置當前練習 ID
+                techniqueSelect.value = practice.technique;  // 自動選擇對應的溝通技巧
+                alert('已選擇練習，請點擊"開始練習"開始對話');
+            };
 
-            // 添加點擊事件載入詳細資料
-            listItem.addEventListener('click', () => {
-                loadPracticeDetails(practice._id);
-            });
-
-            // 創建刪除按鈕
+            // 添加刪除按鈕
             const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'X'; // 刪除按鈕文字
-            deleteButton.style.marginLeft = '10px'; // 讓按鈕和文字分開一些
-            deleteButton.addEventListener('click', (event) => {
-                event.stopPropagation(); // 防止點擊刪除按鈕觸發列表項點擊事件
-                deletePractice(practice._id); // 呼叫刪除函數
-            });
-
-            listItem.appendChild(deleteButton); // 把刪除按鈕加入到列表項目中
-            practiceList.appendChild(listItem); // 把列表項目加入到列表中
+            deleteButton.textContent = 'X';
+            deleteButton.onclick = (e) => {
+                e.stopPropagation();
+                deletePractice(practice._id);
+            };
+            
+            listItem.appendChild(startButton);
+            listItem.appendChild(deleteButton);
+            practiceList.appendChild(listItem);
         });
-
-        console.log('練習列表已載入');
-    } else {
-        console.error('Failed to load practices:', data.message);
     }
 }
 
 
-  
+let currentPracticeId = null; 
   // 創建新練習
   async function createPractice() {
+    const technique = techniqueSelect.value;
+    if (!technique) {
+        alert('請先選擇溝通技巧');
+        return null;
+    }
+
     const token = localStorage.getItem('token');
     const response = await fetch('/api/practice/practices', {
       method: 'POST',
@@ -165,17 +170,19 @@ function displayPracticeDetails(practice) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ technique: '我訊息' }) // 預設為「我訊息」
+      body: JSON.stringify({ technique })
     });
     const data = await response.json();
   
     if (data.success) {
-      loadPractices(); // 重新載入練習列表
-    } else {
-      console.error('Failed to create practice:', data.message);
+      currentPracticeId = data.practice._id;
+      loadPractices();
+      alert('練習已建立，請點擊"開始練習"開始對話');
+      return currentPracticeId;
     }
-  }
-  
+    return null;
+}
+
   // 頁面載入時初始化
   document.getElementById('newPracticeBtn').addEventListener('click', createPractice);
   loadPractices();
@@ -380,9 +387,15 @@ async function startDialogue() {
     }
 
     try {
+        // 檢查是否有選擇溝通技巧
         const technique = techniqueSelect.value;
         if (!technique) {
             throw new Error('請選擇溝通技巧');
+        }
+
+        // 檢查是否已經有練習記錄
+        if (!currentPracticeId) {
+            throw new Error('請先點擊"新增練習"建立練習記錄');
         }
 
         const response = await fetch('/api/dialogue/start-dialogue', {
@@ -391,7 +404,10 @@ async function startDialogue() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ technique }),
+            body: JSON.stringify({ 
+                technique,
+                practiceId: currentPracticeId
+            }),
         });
 
         if (!response.ok) {
@@ -401,10 +417,6 @@ async function startDialogue() {
 
         const data = await response.json();
         
-        if (!data.success) {
-            throw new Error(data.error || '開始對話失敗');
-        }
-
         scenarioDisplay.innerHTML = `
             <div class="message-header">📝 情境</div>
             <div class="message-content">${data.scenario || '無法載入情境'}</div>
@@ -422,9 +434,9 @@ async function startDialogue() {
             </div>
         `;
 
-        // 其他初始化...
     } catch (error) {
         console.error('開始對話失敗:', error);
+        alert(error.message);
         scenarioDisplay.innerHTML = `
             <div class="message error">
                 <div class="message-header">❌ 錯誤</div>
@@ -433,7 +445,6 @@ async function startDialogue() {
         `;
     }
 }
-
 // 輔助函數
 function addTranscriptionPreview() {
     const previewArea = document.createElement('div');

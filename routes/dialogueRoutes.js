@@ -1,13 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { generateChatResponse } = require('../services/openaiService');
-const {
-  resetDialogueState,
-  updateDialogueState,
-  getDialogueState,
-  getCurrentRecordings,
-  resetCurrentRecordings
-} = require('../services/dialogueService');
 const scenarios = require('../data/scenarios');
 
 const {
@@ -15,66 +7,72 @@ const {
   incrementCount
 } = require('../services/dialogueService');
 const { analyzeDialogue } = require('../services/analysisService');
+const { updatePractice } = require('../services/practiceService'); // 匯入練習服務模組
+const { resetDialogueState, updateDialogueState, getDialogueState } = require('../services/dialogueService'); // 匯入對話狀態管理
+const { generateChatResponse } = require('../services/openaiService'); // 匯入 OpenAI API 工具
 
-
+/**
+ * POST /start-dialogue
+ * 初始化一個新的對話，生成情境、教師建議，並與練習紀錄關聯。
+ */
 router.post('/start-dialogue', async (req, res) => {
-    try {
-      console.log('Starting new dialogue session'); // 加入除錯日誌
-      
-      const { technique } = req.body;
-      if (!technique) {
-        throw new Error('Technique not specified');
-      }
-      
-      resetDialogueState(technique);
-      
-      // 確保 scenarios 陣列不為空
-      if (!scenarios || scenarios.length === 0) {
-        throw new Error('No scenarios available');
-      }
-      
-      const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-      console.log('Selected scenario:', randomScenario); // 加入除錯日誌
-      
-      const initialMessage = createInitialMessage(randomScenario);
-      console.log('Created initial message:', initialMessage); // 加入除錯日誌
-      
-      const response = await generateChatResponse([{
-        role: "user",
-        content: initialMessage
-      }]);
-      
-      console.log('Received AI response:', response); // 加入除錯日誌
-      
-      const parsedResponse = parseInitialResponse(response);
-      if (!parsedResponse) {
-        throw new Error('Failed to parse AI response');
-      }
-      
-      const { scenario, teacherSuggestion, firstResponse } = parsedResponse;
-      
-      // 更新對話狀態
-      updateDialogueState({
-        scenario,
-        history: [{ role: "家長", content: firstResponse }],
-        count: 1
-      });
-      
-      res.json({
-        success: true,
-        scenario,
-        teacherSuggestion,
-        response: firstResponse
-      });
-      
-    } catch (error) {
-      console.error('Error in start-dialogue:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'An error occurred while starting the dialogue'
-      });
+  try {
+    const { technique, practiceId } = req.body; // 從請求中提取溝通技巧和練習 ID
+    if (!technique || !practiceId) {
+      // 若缺少必要參數，拋出錯誤
+      throw new Error('Technique or practiceId not specified');
     }
-  });
+
+    // 重置對話狀態，並設置當前溝通技巧
+    resetDialogueState(technique);
+
+    // 隨機選擇一個情境
+    const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+    console.log('Selected scenario:', randomScenario); // 調試用
+
+    // 根據情境生成初始消息
+    const initialMessage = createInitialMessage(randomScenario);
+    console.log('Initial message created:', initialMessage); // 調試用
+
+    // 與 OpenAI 進行交互，獲取 AI 的初始回應
+    const response = await generateChatResponse([{ role: "user", content: initialMessage }]);
+    console.log('AI response received:', response); // 調試用
+
+    // 將 AI 回應解析為情境細節和教師建議
+    const parsedResponse = parseInitialResponse(response);
+    if (!parsedResponse) {
+      throw new Error('Failed to parse AI response');
+    }
+
+    const { scenario, teacherSuggestion, firstResponse } = parsedResponse;
+
+    // 更新對話狀態
+    updateDialogueState({
+      scenario, // 保存情境
+      history: [{ role: "家長", content: firstResponse }], // 初始對話記錄
+      count: 1 // 對話回合計數
+    });
+
+    // 更新練習紀錄：保存情境與教師建議
+    await updatePractice(practiceId, { scenario, teacherSuggestion });
+
+    // 返回初始化成功的訊息
+    res.json({
+      success: true,
+      scenario, // 回傳情境
+      teacherSuggestion, // 回傳教師建議
+      response: firstResponse // 回傳 AI 的初始回應
+    });
+
+  } catch (error) {
+    // 捕捉所有錯誤，並回傳錯誤訊息
+    console.error('Error in start-dialogue:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'An error occurred while starting the dialogue'
+    });
+  }
+});
 
 // 輔助函數
 function createInitialMessage(scenario) {
