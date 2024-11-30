@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <button onclick="testOpenAI()">Test OpenAI</button>
+  <div id="result"></div>
+
+  <script>
+    async function testOpenAI() {
+      const response = await fetch('/test-openai');
+      const data = await response.json();
+      document.getElementById('result').innerText = data.result;
+    }
+  </script>
+</body>
+</html>

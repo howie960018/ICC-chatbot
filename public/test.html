@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>溝通技巧訓練系統</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div id="header" class="header">
+        <h2 id="welcomeMessage">歡迎!</h2>
+        <button id="logoutButton">登出</button>
+    </div>
+    
+    <div class="container">
+
+        <div id="practiceSidebar" class="recordings-sidebar">
+            <div class="recordings-title">練習紀錄</div>
+            <ul id="practiceList"></ul>
+            <button id="newPracticeBtn">新增練習</button>
+        </div>
+        
+          
+        <div class="main-section">
+            <div class="panel">
+                <select id="techniqueSelect">
+                    <option value="我訊息">我訊息</option>
+                    <option value="三明治溝通法">三明治溝通法</option>
+                    <option value="綜合溝通技巧">綜合溝通技巧</option>
+                </select>
+                <button id="startPracticeBtn">開始練習</button>
+            </div>
+    
+            <div id="scenarioDisplay" class="panel"></div>
+            <div id="dialogueDisplay" class="panel"></div>
+    
+            <div class="record-controls panel">
+                <button id="startRecordBtn">開始錄音</button>
+                <button id="stopRecordBtn" disabled>停止錄音</button>
+            </div>
+    
+            <div id="recordStatus" class="status"></div>
+            <div id="audioPlayback" class="audio-playback" style="display: none;"></div>
+            
+            <div id="analysisDisplay" class="panel">
+                <h3>分析結果</h3>
+                <div id="analysisContent"></div>
+            </div>
+        </div>
+    
+        <div class="recordings-sidebar">
+            <div class="recordings-title">錄音歷史</div>
+            <div id="recordingsList"></div>
+        </div>
+
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

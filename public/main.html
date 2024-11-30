@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Main Page</title>
+  <script src="/js/welcome.js" defer></script>
+</head>
+<body>
+  <h1 id="user-welcome">歡迎!</h1>
+  <button id="logout-button" style="display: none;">登出</button>
+
+
+  <script>
+    async function validateSession() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert('尚未登入，將跳轉至登入頁面');
+            window.location.href = '/login';
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/verify', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error('驗證失敗');
+            }
+
+            document.getElementById('user-welcome').textContent = `歡迎, ${data.user.username}`;
+        } catch (error) {
+            alert('驗證失敗，請重新登入');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        }
+    }
+
+    validateSession();
+</script>
+
+</body>
+</html>

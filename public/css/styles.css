@@ -1,0 +1,405 @@
+/* 基本樣式 */
+body {
+    font-family: Arial, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+}
+
+/* 容器佈局 */
+.container {
+
+    display: flex;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.main-section {
+
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 800px;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* 面板樣式 */
+.panel {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 顯示區域樣式 */
+#scenarioDisplay, #dialogueDisplay {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* 分析顯示區域樣式 */
+#analysisDisplay {
+    background-color: #f8f9fa;
+    border-left: 4px solid #4CAF50;
+    padding: 20px;
+    margin-top: 20px;
+    grid-column: 1 / -1;
+}
+
+#analysisDisplay h3 {
+    color: #2E7D32;
+    margin-top: 0;
+    font-size: 1.2em;
+    margin-bottom: 1em;
+}
+
+#analysisContent {
+    font-size: 1.2em;
+    line-height: 1.6;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+#analysisContent pre {
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    font-size: inherit;
+}
+
+/* 分析項目樣式 */
+.analysis-item {
+    margin-bottom: 1.2em;
+    padding-left: 1em;
+}
+
+.analysis-item:last-child {
+    margin-bottom: 0;
+}
+
+.final-suggestion {
+    margin-top: 1.5em;
+    padding-top: 1.5em;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* 對話條目樣式 */
+.entry {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.family {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.teacher {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+/* 表單元素樣式 */
+select, button {
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    margin-right: 10px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* 錄音控制樣式 */
+.record-controls {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.record-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.status {
+    padding: 10px;
+    color: #666;
+    text-align: center;
+}
+
+/* 音訊播放區域樣式 */
+.audio-playback {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+#recordingsList {
+    list-style: none;
+    padding: 0;
+}
+
+#recordingsList li {
+    background-color: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+
+audio {
+    width: 100%;
+    margin: 10px 0;
+}
+
+.recording-time {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.recording-text {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: white;
+    border-radius: 4px;
+}
+
+/* 對話顯示樣式 */
+#dialogueDisplay {
+    background-color: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* 訊息樣式 */
+.message {
+    margin: 10px 0;
+    max-width: 80%;
+    padding: 12px 15px;
+    border-radius: 15px;
+    position: relative;
+    word-wrap: break-word;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message.parent, .message.家長 {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    margin-right: auto;
+    margin-left: 0;
+    border-bottom-left-radius: 5px;
+}
+
+.message.teacher, .message.老師 {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    margin-left: auto;
+    margin-right: 0;
+    border-bottom-right-radius: 5px;
+}
+
+.message.suggestion {
+    background-color: #fff3e0;
+    border-left: 3px solid #ff9800;
+    max-width: 100%;
+    width: 95%;
+    margin: 20px auto;
+    border-radius: 8px;
+}
+
+.message-content {
+    line-height: 1.4;
+    margin: 8px 0;
+}
+
+/* 訊息時間和標題對齊 */
+.message.parent .message-time,
+.message.parent .message-header {
+    text-align: left;
+}
+
+.message.teacher .message-time,
+.message.teacher .message-header {
+    text-align: right;
+}
+
+/* 預覽區域樣式 */
+.preview-area {
+    background-color: rgba(232, 245, 233, 0.5);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    display: none;
+}
+
+.preview-area.active {
+    display: block;
+}
+
+#practiceSidebar {
+    width: 20%; /* 調整寬度為 20% */
+    max-width: 250px; /* 設定最大寬度 */
+    min-width: 150px; /* 設定最小寬度，避免過窄 */
+    overflow-y: auto; /* 如果內容超出高度，可以垂直滾動 */
+    border-right: 1px solid #ddd; /* 增加分隔線讓版面更有結構 */
+    padding: 10px; /* 增加內邊距讓內容更美觀 */
+    box-sizing: border-box; /* 確保 padding 不影響元素的實際寬度 */
+}
+
+/* 錄音列表樣式 */
+
+.recordings-sidebar {
+    /* width: 350px;
+    position: sticky;
+    top: 20px;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+    width: 20%; /* 右側錄音歷史區域的寬度與左側一致 */
+    max-width: 250px;
+    min-width: 150px;
+    overflow-y: auto;
+    padding: 10px;
+    border-left: 1px solid #ddd; /* 增加分隔線 */
+    box-sizing: border-box;
+}
+
+.recordings-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+#recordingsList {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.recording-item {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recording-time {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.recording-text {
+    background-color: white;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.recording-audio audio {
+    width: 100%;
+    margin-top: 8px;
+}
+
+
+
+
+.recording-text p {
+    margin: 5px 0;
+    line-height: 1.4;
+    color: #333;
+}
+
+
+.no-recordings {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+.error-message {
+    color: #dc3545;
+    text-align: center;
+    padding: 20px;
+}
+
+
+/* 響應式設計 */
+@media (max-width: 1200px) {
+    .container {
+        flex-direction: column;
+    }
+    
+    .recordings-sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 400px;
+        position: static;
+    }
+    
+    .main-section {
+        max-width: 100%;
+    }
+}
