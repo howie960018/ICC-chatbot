@@ -63,23 +63,23 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
  * GET /recordings
  * 獲取當前對話的錄音歷史。
  */
-router.get('/recordings', (req, res) => {
+router.get('/recordings', async (req, res) => {
   try {
-    const dialogueState = getDialogueState();
-    const recordings = dialogueState.recordings || [];
+      const { practiceId } = req.query;
+      const user = await User.findOne({ 'practices._id': practiceId });
+      const practice = user.practices.id(practiceId);
+      
+      const formattedRecordings = (practice.recordings || []).map(recording => ({
+          timestamp: recording.timestamp,
+          path: `/recordings/${recording.path}`, // 修改為正確的靜態文件路徑
+          transcription: recording.transcription || ''
+      }));
 
-    // 格式化錄音歷史數據
-    const formattedRecordings = recordings.map(recording => ({
-      timestamp: recording.timestamp,
-      path: recording.path,
-      transcription: recording.transcription || ''
-    }));
-
-    res.json(formattedRecordings);
+      res.json({ success: true, recordings: formattedRecordings });
   } catch (error) {
-    console.error('Error fetching recordings:', error);
-    res.status(500).json({ error: 'Failed to fetch recordings history' });
+      res.status(500).json({ error: error.message });
   }
 });
+
 
 module.exports = router;

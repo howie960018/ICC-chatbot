@@ -75,9 +75,13 @@ async function refreshAuthToken() {
 // 定期檢查 token
 setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 
-function selectPractice(practiceId) {
+// 在選擇練習時
+async function selectPractice(practiceId) {
     currentPracticeId = practiceId;
-    localStorage.setItem('currentPracticeId', currentPracticeId); // 儲存到 LocalStorage
+    localStorage.setItem('currentPracticeId', currentPracticeId);
+    
+    await loadPracticeDetails(practiceId);
+    await loadRecordingsHistory(practiceId);
 }
 
 async function loadPracticeDetails(practiceId) {
@@ -104,16 +108,37 @@ function displayPracticeDetails(practice) {
     const techniqueDisplay = document.getElementById('scenarioDisplay');
     techniqueDisplay.textContent = `溝通技巧：${practice.technique}`;
 
-    const analysisContent = document.getElementById('analysisContent');
-    analysisContent.textContent = practice.analysis || '尚無分析結果';
+
+
+    if (practice.analysis) {
+        // 將分析內容按段落分割
+        const paragraphs = practice.analysis.split(/(?<=。)\s/); // 按句號+空格切分段落
+
+        paragraphs.forEach(paragraph => {
+            const paragraphElement = document.createElement('p');
+            paragraphElement.textContent = paragraph.trim();
+            analysisContent.appendChild(paragraphElement);
+        });
+    } else {
+        analysisContent.textContent = '尚無分析結果';
+    }
 
     const dialogueDisplay = document.getElementById('dialogueDisplay');
     dialogueDisplay.innerHTML = ''; // 清空舊聊天記錄
 
     practice.history.forEach(entry => {
+        // 每條對話
         const message = document.createElement('div');
-        message.textContent = `${entry.role}: ${entry.content}`;
+        message.textContent = `${entry.role}:`;
+
+        // 對話內容
+        const content = document.createElement('div');
+        content.style.marginBottom = '20px'; // 添加空行間距
+        content.textContent = entry.content;
+
+        // 加入對話顯示容器
         dialogueDisplay.appendChild(message);
+        dialogueDisplay.appendChild(content);
     });
 
     console.log('練習詳細資訊已載入'); // 測試是否正確載入
@@ -144,6 +169,7 @@ function displayPracticeDetails(practice) {
             selectButton.onclick = async () => {
                 selectPractice(practice._id); // 儲存當前練習 ID
                 await loadPracticeDetails(practice._id); // 加載練習詳細資訊
+                
             };
 
             // 添加刪除按鈕
@@ -546,26 +572,17 @@ startPracticeBtn.addEventListener('click', () => {
 });
 
 // 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // if (!checkAuthStatus()) {
-    //     return;
-    // }
-    
-    // loadRecordingsHistory();
-    // addTranscriptionPreview();
-    // refreshAuthToken(); // 初始檢查
-
+document.addEventListener('DOMContentLoaded', async () => {
     if (!checkAuthStatus()) {
         return;
     }
 
-    // 加載練習列表
-    loadPractices();
+    await loadPractices();
     currentPracticeId = localStorage.getItem('currentPracticeId');
 
-    // 如果有選中的練習 ID，重新加載該練習的詳細資訊
     if (currentPracticeId) {
-        loadPracticeDetails(currentPracticeId);
+        await loadPracticeDetails(currentPracticeId);
+        await loadRecordingsHistory(currentPracticeId);
     }
 });
 
@@ -574,50 +591,46 @@ function clearAnalysis() {
     analysisContent.innerHTML = '';
 }
 
-async function loadRecordingsHistory() {
+async function loadRecordingsHistory(practiceId) {
     try {
-        const response = await fetch('/api/audio/recordings', {
+        // 使用傳入的 practiceId，如果沒有就使用當前的
+        const targetPracticeId = practiceId || currentPracticeId;
+
+        if (!targetPracticeId) {
+            console.warn('無法載入錄音歷史：未指定練習 ID');
+            return;
+        }
+
+        const response = await fetch(`/api/audio/recordings?practiceId=${targetPracticeId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        const recordings = await response.json();
-        
-        const recordingsList = document.getElementById('recordingsList');
-        if (!recordingsList) {
-            console.error('recordingsList element not found');
-            return;
-        }
 
-        if (!Array.isArray(recordings) || recordings.length === 0) {
+        const data = await response.json();
+        const recordingsList = document.getElementById('recordingsList');
+
+        if (!data.success || !Array.isArray(data.recordings)) {
             recordingsList.innerHTML = '<li class="no-recordings">暫無錄音記錄</li>';
             return;
         }
 
-        recordingsList.innerHTML = recordings
-            // 按時間正序排列 (舊的在上面)
-            .sort((a, b) => a.timestamp - b.timestamp) 
-            .map(recording => `
-                <li class="recording-item">
-                    <div class="recording-time">
-                        ${new Date(recording.timestamp).toLocaleString('zh-TW', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        })}
-                    </div>
-                    <div class="recording-text">
-                        <strong>轉錄文字：</strong>
-                        <p>${recording.transcription || '無轉錄文字'}</p>
-                    </div>
-                    <div class="recording-audio">
-                        <audio controls src="/recordings/${recording.path}"></audio>
-                    </div>
-                </li>
-            `).join('');
+        const sortedRecordings = data.recordings.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        recordingsList.innerHTML = sortedRecordings.map(recording => `
+            <li class="recording-item">
+                <div class="recording-time">
+                    ${new Date(recording.timestamp).toLocaleString('zh-TW')}
+                </div>
+                <div class="recording-audio">
+                    <audio controls src="${recording.path}"></audio>
+                </div>
+                <div class="recording-text">
+                    <p>${recording.transcription || '無轉錄文字'}</p>
+                </div>
+            </li>
+        `).join('');
+
     } catch (error) {
         console.error('載入錄音歷史失敗:', error);
         const recordingsList = document.getElementById('recordingsList');
