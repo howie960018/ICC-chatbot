@@ -8,24 +8,28 @@ const { updatePractice } = require('../services/practiceService'); // 引入練�
  * @returns {String} 分析結果
  */
 async function analyzeDialogue(practiceId) {
-  // 獲取當前對話狀態
-  const dialogueState = getDialogueState();
-  const conversationHistory = dialogueState.history.map(entry => `${entry.role}: ${entry.content}`).join('\n');
 
-  // 生成分析提示
+  const dialogueState = getDialogueState();
+
+  if (!practiceId || !dialogueState || !dialogueState.history) {
+      throw new Error('無效的練習 ID 或對話狀態');
+  }
+
+  const limitedHistory = dialogueState.history.slice(-15);
+  const conversationHistory = limitedHistory.map(entry => `${entry.role}: ${entry.content}`).join('\n');
   const prompt = generatePrompt(dialogueState.technique, conversationHistory);
 
   try {
-    // 通過 OpenAI API 獲取分析結果
-    const analysis = await generateChatResponse([{ role: "user", content: prompt }]);
 
-    // 保存分析結果到練習紀錄
-    await updatePractice(practiceId, { analysis });
+      const analysis = await generateChatResponse([{ role: "user", content: prompt }]);
+      await updatePractice(practiceId, { analysis });
+      return analysis;
 
-    return analysis;
   } catch (error) {
-    console.error('Error analyzing dialogue:', error);
-    throw error;
+
+      console.error('Error during analysis:', error.message || error);
+      throw new Error('分析過程中發生錯誤，請稍後重試');
+
   }
 }
 

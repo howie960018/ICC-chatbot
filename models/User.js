@@ -35,6 +35,9 @@ const UserSchema = new mongoose.Schema({
         type: Date,
         default: Date.now // 每個練習的創建時間
       },
+      scenario: {
+        type: String, // 儲存情境內容
+      },
       technique: {
         type: String, // 溝通技巧名稱
         required: [true, '溝通技巧為必填']

@@ -75,20 +75,27 @@ async function refreshAuthToken() {
 // 定期檢查 token
 setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 
+function selectPractice(practiceId) {
+    currentPracticeId = practiceId;
+    localStorage.setItem('currentPracticeId', currentPracticeId); // 儲存到 LocalStorage
+}
 
 async function loadPracticeDetails(practiceId) {
-    const token = localStorage.getItem('token'); // 獲取 Token
+    const token = localStorage.getItem('token');
+
     const response = await fetch(`/api/practice/practices/${practiceId}`, {
         headers: { Authorization: `Bearer ${token}` }
     });
     const data = await response.json();
 
     if (data.success) {
-        displayPracticeDetails(data.practice); // 顯示練習細節
+        displayPracticeDetails(data.practice); // 將返回的練習數據渲染到 UI
     } else {
         console.error('Failed to load practice details:', data.message);
     }
 }
+
+
 
 // 顯示練習詳細資訊
 function displayPracticeDetails(practice) {
@@ -116,48 +123,57 @@ function displayPracticeDetails(practice) {
   
   // 更新練習列表，讓每個項目存放 ID
   async function loadPractices() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token'); // 從 LocalStorage 中獲取用戶的授權 Token
     const response = await fetch('/api/practice/practices', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` } // 添加授權標頭
     });
-    const data = await response.json();
+    const data = await response.json(); // 解析返回的 JSON 資料
 
     if (data.success) {
-        const practiceList = document.getElementById('practiceList');
-        practiceList.innerHTML = '';
+        const practiceList = document.getElementById('practiceList'); // 獲取練習列表的 DOM 元素
+        practiceList.innerHTML = ''; // 清空列表，準備重新加載
 
         data.practices.forEach(practice => {
+            // 創建列表項目
             const listItem = document.createElement('li');
             listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleString()}`;
-            
-            // 添加開始按鈕
-            const startButton = document.createElement('button');
-            startButton.textContent = '選擇';  // 改名為"選擇"更符合實際功能
-            startButton.onclick = () => {
-                currentPracticeId = practice._id;  // 設置當前練習 ID
-                techniqueSelect.value = practice.technique;  // 自動選擇對應的溝通技巧
-                alert('已選擇練習，請點擊"開始練習"開始對話');
+
+            // 添加選擇按鈕
+            const selectButton = document.createElement('button');
+            selectButton.textContent = '選擇';
+            selectButton.onclick = async () => {
+                selectPractice(practice._id); // 儲存當前練習 ID
+                await loadPracticeDetails(practice._id); // 加載練習詳細資訊
             };
 
             // 添加刪除按鈕
             const deleteButton = document.createElement('button');
             deleteButton.textContent = 'X';
-            deleteButton.onclick = (e) => {
-                e.stopPropagation();
-                deletePractice(practice._id);
+            deleteButton.onclick = async (e) => {
+                e.stopPropagation(); // 防止點擊刪除按鈕時觸發列表項點擊事件
+                if (confirm('確認刪除此練習紀錄？')) {
+                    await deletePractice(practice._id); // 刪除該練習
+                }
             };
-            
-            listItem.appendChild(startButton);
+
+            // 將按鈕添加到列表項目
+            listItem.appendChild(selectButton);
             listItem.appendChild(deleteButton);
+
+            // 將列表項目添加到練習列表
             practiceList.appendChild(listItem);
         });
+    } else {
+        console.error('Failed to load practices:', data.message); // 如果後端返回錯誤，輸出到控制台
     }
 }
+
 
 
 let currentPracticeId = null; 
   // 創建新練習
   async function createPractice() {
+
     const technique = techniqueSelect.value;
     if (!technique) {
         alert('請先選擇溝通技巧');
@@ -165,6 +181,7 @@ let currentPracticeId = null;
     }
 
     const token = localStorage.getItem('token');
+
     const response = await fetch('/api/practice/practices', {
       method: 'POST',
       headers: {
@@ -190,29 +207,26 @@ let currentPracticeId = null;
 
   
   async function deletePractice(practiceId) {
-    const token = localStorage.getItem('token'); // 獲取 Token
+    const token = localStorage.getItem('token');
 
-    if (confirm('確認刪除此練習紀錄？')) { // 提示用戶是否確認刪除
-        try {
-            const response = await fetch(`/api/practice/practices/${practiceId}`, {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            const data = await response.json();
+    const response = await fetch(`/api/practice/practices/${practiceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await response.json();
 
-            if (data.success) {
-                alert('練習紀錄已刪除');
-                loadPractices(); // 刪除後重新載入練習列表
-            } else {
-                console.error('Failed to delete practice:', data.message);
-            }
-        } catch (error) {
-            console.error('Error deleting practice:', error);
+    if (data.success) {
+        alert('練習紀錄已刪除');
+        if (currentPracticeId === practiceId) {
+            localStorage.removeItem('currentPracticeId'); // 如果刪除的是當前練習，清空選擇
+            currentPracticeId = null;
         }
+        await loadPractices(); // 重新加載列表
+    } else {
+        console.error('刪除練習失敗:', data.message);
     }
 }
+
 
 
 // 錄音功能
@@ -533,13 +547,26 @@ startPracticeBtn.addEventListener('click', () => {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
+    // if (!checkAuthStatus()) {
+    //     return;
+    // }
+    
+    // loadRecordingsHistory();
+    // addTranscriptionPreview();
+    // refreshAuthToken(); // 初始檢查
+
     if (!checkAuthStatus()) {
         return;
     }
-    
-    loadRecordingsHistory();
-    addTranscriptionPreview();
-    refreshAuthToken(); // 初始檢查
+
+    // 加載練習列表
+    loadPractices();
+    currentPracticeId = localStorage.getItem('currentPracticeId');
+
+    // 如果有選中的練習 ID，重新加載該練習的詳細資訊
+    if (currentPracticeId) {
+        loadPracticeDetails(currentPracticeId);
+    }
 });
 
 // 分析相關函數
@@ -598,7 +625,6 @@ async function loadRecordingsHistory() {
     }
 }
 
-// main.js
 async function handleSubmission(text) {
     isWaitingForSubmission = false;
     recordStatus.textContent = '正在等待 AI 回應...';
@@ -614,7 +640,10 @@ async function handleSubmission(text) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ userResponse: text })
+            body: JSON.stringify({ 
+                userResponse: text,
+                practiceId: currentPracticeId // 確保包含練習 ID
+            })
         });
 
         if (!response.ok) {

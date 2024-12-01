@@ -1,5 +1,5 @@
 const User = require('../models/User');
-
+const mongoose = require('mongoose');
 /**
  * 更新指定練習的資料
  * @param {String} userId 使用者 ID
@@ -9,67 +9,118 @@ const User = require('../models/User');
  */
 async function updatePractice(practiceId, updates) {
   try {
-    console.log('Updating practice with:', {
-      practiceId,
-      updates
-    });
+      console.log('Updating practice with:', { practiceId, updates });
 
-    // 確保 updates 是一個物件而不是字串
-    const updatesObj = typeof updates === 'string' ? { content: updates } : updates;
+      const updatesObj = typeof updates === 'string' ? { content: updates } : updates;
 
-    // 尋找包含指定練習 ID 的使用者
-    const user = await User.findOne({ 'practices._id': practiceId });
-    if (!user) {
-      console.error('Practice not found for ID:', practiceId);
-      throw new Error('練習不存在');
-    }
+      const user = await User.findOne({ 'practices._id': practiceId });
 
-    // 找到對應的練習
-    const practice = user.practices.id(practiceId);
-    if (!practice) {
-      console.error('Practice not found in user document');
-      throw new Error('練習不存在');
-    }
-
-    // 處理歷史記錄更新
-    if (updatesObj.history) {
-      if (!Array.isArray(practice.history)) {
-        practice.history = [];
+      if (!user) {
+          console.error('找不到練習:', practiceId);
+          throw new Error('練習不存在');
       }
-      practice.history = [...practice.history, ...updatesObj.history];
-    }
 
-    // 處理情境和建議更新
-    if (updatesObj.scenario) {
-      practice.scenario = updatesObj.scenario;
-    }
-    if (updatesObj.teacherSuggestion) {
-      practice.teacherSuggestion = updatesObj.teacherSuggestion;
-    }
+      const practice = user.practices.id(practiceId);
 
-    // 處理其他更新欄位
-    if (updatesObj.analysis) {
-      practice.analysis = updatesObj.analysis;
-    }
-    if (updatesObj.recordings) {
-      if (!Array.isArray(practice.recordings)) {
-        practice.recordings = [];
+      if (!practice) {
+          console.error('練習不存在於用戶文檔中');
+          throw new Error('練習不存在');
       }
-      practice.recordings = [...practice.recordings, ...updatesObj.recordings];
-    }
 
-    console.log('Updated practice before save:', practice);
+      if (updatesObj.history) {
+          if (!Array.isArray(practice.history)) {
+              practice.history = [];
+          }
+          practice.history = [...practice.history, ...updatesObj.history];
+      }
 
-    // 保存更新
-    await user.save();
-    return practice;
+      if (updatesObj.scenario) {
+          practice.scenario = updatesObj.scenario;
+      }
+      if (updatesObj.teacherSuggestion) {
+          practice.teacherSuggestion = updatesObj.teacherSuggestion;
+      }
+      if (updatesObj.analysis) {
+          practice.analysis = updatesObj.analysis;
+      }
 
+      console.log('練習更新前的內容:', practice);
+      await user.save();
+
+      console.log('練習更新成功');
+      return practice;
 
   } catch (error) {
-    console.error('Error updating practice:', error);
-    throw error;
+
+      console.error('Error updating practice:', error.message || error);
+      throw error;
+
   }
 }
+
+// async function updatePractice(practiceId, updates) {
+//   try {
+//     console.log('Updating practice with:', {
+//       practiceId,
+//       updates
+//     });
+
+//     // 確保 updates 是一個物件而不是字串
+//     const updatesObj = typeof updates === 'string' ? { content: updates } : updates;
+
+//     // 尋找包含指定練習 ID 的使用者
+//     const user = await User.findOne({ 'practices._id': practiceId });
+//     if (!user) {
+//       console.error('Practice not found for ID:', practiceId);
+//       throw new Error('練習不存在');
+//     }
+
+//     // 找到對應的練習
+//     const practice = user.practices.id(practiceId);
+//     if (!practice) {
+//       console.error('Practice not found in user document');
+//       throw new Error('練習不存在');
+//     }
+
+//     // 處理歷史記錄更新
+//     if (updatesObj.history) {
+//       if (!Array.isArray(practice.history)) {
+//         practice.history = [];
+//       }
+//       practice.history = [...practice.history, ...updatesObj.history];
+//     }
+
+//     // 處理情境和建議更新
+//     if (updatesObj.scenario) {
+//       practice.scenario = updatesObj.scenario;
+//     }
+//     if (updatesObj.teacherSuggestion) {
+//       practice.teacherSuggestion = updatesObj.teacherSuggestion;
+//     }
+
+//     // 處理其他更新欄位
+//     if (updatesObj.analysis) {
+//       practice.analysis = updatesObj.analysis;
+//     }
+//     if (updatesObj.recordings) {
+//       if (!Array.isArray(practice.recordings)) {
+//         practice.recordings = [];
+//       }
+//       practice.recordings = [...practice.recordings, ...updatesObj.recordings];
+//     }
+
+//     console.log('Updated practice before save:', practice);
+
+//     // 保存更新
+//     await user.save();
+//     return practice;
+
+
+//   } catch (error) {
+//     console.error('Error updating practice:', error);
+//     throw error;
+//   }
+// }
 
 /**
  * 獲取指定使用者的所有練習
