@@ -7,23 +7,64 @@ const User = require('../models/User');
  * @param {Object} updates 要更新的資料
  * @returns {Object} 更新後的練習物件
  */
-async function updatePractice(userId, practiceId, updates) {
+async function updatePractice(practiceId, updates) {
   try {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new Error('使用者不存在');
-    }
+    console.log('Updating practice with:', {
+      practiceId,
+      updates
+    });
 
-    const practice = user.practices.id(practiceId);
-    if (!practice) {
+    // 確保 updates 是一個物件而不是字串
+    const updatesObj = typeof updates === 'string' ? { content: updates } : updates;
+
+    // 尋找包含指定練習 ID 的使用者
+    const user = await User.findOne({ 'practices._id': practiceId });
+    if (!user) {
+      console.error('Practice not found for ID:', practiceId);
       throw new Error('練習不存在');
     }
 
-    // 更新練習的欄位
-    Object.assign(practice, updates);
+    // 找到對應的練習
+    const practice = user.practices.id(practiceId);
+    if (!practice) {
+      console.error('Practice not found in user document');
+      throw new Error('練習不存在');
+    }
 
-    await user.save(); // 保存變更到資料庫
+    // 處理歷史記錄更新
+    if (updatesObj.history) {
+      if (!Array.isArray(practice.history)) {
+        practice.history = [];
+      }
+      practice.history = [...practice.history, ...updatesObj.history];
+    }
+
+    // 處理情境和建議更新
+    if (updatesObj.scenario) {
+      practice.scenario = updatesObj.scenario;
+    }
+    if (updatesObj.teacherSuggestion) {
+      practice.teacherSuggestion = updatesObj.teacherSuggestion;
+    }
+
+    // 處理其他更新欄位
+    if (updatesObj.analysis) {
+      practice.analysis = updatesObj.analysis;
+    }
+    if (updatesObj.recordings) {
+      if (!Array.isArray(practice.recordings)) {
+        practice.recordings = [];
+      }
+      practice.recordings = [...practice.recordings, ...updatesObj.recordings];
+    }
+
+    console.log('Updated practice before save:', practice);
+
+    // 保存更新
+    await user.save();
     return practice;
+
+
   } catch (error) {
     console.error('Error updating practice:', error);
     throw error;

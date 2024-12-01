@@ -7,15 +7,17 @@ const openai = new OpenAI({
 
 async function transcribeAudio(audioStream) {
   try {
+    console.log('開始進行音頻轉錄...');
     const transcription = await openai.audio.transcriptions.create({
       file: audioStream,
       model: "whisper-1",
       language: "zh"
     });
+    console.log('轉錄成功:', transcription.text);
     return transcription.text;
   } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw error;
+    console.error('OpenAI API 發生錯誤:', error);
+    throw new Error('轉錄失敗，請檢查音頻文件或 OpenAI 配置');
   }
 }
 

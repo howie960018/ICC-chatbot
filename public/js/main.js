@@ -92,6 +92,7 @@ async function loadPracticeDetails(practiceId) {
 
 // 顯示練習詳細資訊
 function displayPracticeDetails(practice) {
+
     // 示例：顯示練習溝通技巧和分析結果
     const techniqueDisplay = document.getElementById('scenarioDisplay');
     techniqueDisplay.textContent = `溝通技巧：${practice.technique}`;
@@ -237,8 +238,14 @@ startRecordBtn.addEventListener('click', async () => {
             recordStatus.textContent = '處理中...請稍候';
             
             try {
+
+                if (!currentPracticeId) {
+                    throw new Error('未選擇練習 ID，請先建立或選擇一個練習');
+                }
+
                 const formData = new FormData();
                 formData.append('audio', audioBlob);
+                formData.append('practiceId', currentPracticeId);
         
                 // 添加認證 header
                 const response = await fetch('/api/audio/transcribe', {
@@ -257,11 +264,12 @@ startRecordBtn.addEventListener('click', async () => {
                 }
         
                 if (!response.ok) {
-                    throw new Error('轉錄失敗');
+                    throw new Error('轉錄 API 請求失敗');
                 }
         
                 const data = await response.json();
                 const transcribedText = data.text;
+                console.log('轉錄文字:', transcribedText);
                 
                 currentAccumulatedText = currentAccumulatedText 
                     ? currentAccumulatedText + ' ' + transcribedText 
