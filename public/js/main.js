@@ -7,6 +7,7 @@ const startRecordBtn = document.getElementById('startRecordBtn');
 const stopRecordBtn = document.getElementById('stopRecordBtn');
 const recordStatus = document.getElementById('recordStatus');
 const analysisContent = document.getElementById('analysisContent');
+const practiceSelect = document.getElementById('select-btn');
 
 // 全局變數
 let mediaRecorder = null;
@@ -104,10 +105,14 @@ async function loadPracticeDetails(practiceId) {
 // 顯示練習詳細資訊
 function displayPracticeDetails(practice) {
 
+    
+
     // 示例：顯示練習溝通技巧和分析結果
     const techniqueDisplay = document.getElementById('scenarioDisplay');
-    techniqueDisplay.textContent = `溝通技巧：${practice.technique}`;
-
+    techniqueDisplay.innerHTML = `
+        <p><strong>⭐ 溝通技巧：</strong>${practice.technique}</p>
+        <p><strong>📖 情境：</strong>${practice.scenario}</p>
+    `;
 
 
     if (practice.analysis) {
@@ -124,16 +129,28 @@ function displayPracticeDetails(practice) {
     }
 
     const dialogueDisplay = document.getElementById('dialogueDisplay');
+
+    
+    // 美化對話記錄區域背景
+    dialogueDisplay.style.backgroundColor = 'white'; // 背景色白色
+    dialogueDisplay.style.border = '1px solid #ddd'; // 灰色邊框
+    dialogueDisplay.style.borderRadius = '10px'; // 圓角
+    dialogueDisplay.style.padding = '20px'; // 內邊距
+    dialogueDisplay.style.marginTop = '20px'; // 與其他內容的間距
+    dialogueDisplay.style.boxShadow = '0px 2px 5px rgba(0, 0, 0, 0.1)'; // 陰影效果
+    
+    // 清空舊內容並插入對話
     dialogueDisplay.innerHTML = ''; // 清空舊聊天記錄
 
     practice.history.forEach(entry => {
-        // 每條對話
+        // 每條對話的角色 (家長或導師)
         const message = document.createElement('div');
-        message.textContent = `${entry.role}:`;
+        message.innerHTML = `<strong>${entry.role === '家長' ? '👨‍👩‍👧‍👦 家長' : '👨‍🏫 導師'}:</strong>`;
 
         // 對話內容
         const content = document.createElement('div');
         content.style.marginBottom = '20px'; // 添加空行間距
+        content.style.paddingLeft = '20px'; // 給內容留一點縮進，和角色標題分開
         content.textContent = entry.content;
 
         // 加入對話顯示容器
@@ -161,24 +178,28 @@ function displayPracticeDetails(practice) {
         data.practices.forEach(practice => {
             // 創建列表項目
             const listItem = document.createElement('li');
-            listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleString()}`;
+            listItem.textContent = `${new Date(practice.createdAt).toLocaleDateString('zh-TW')}`;
 
             // 添加選擇按鈕
-            const selectButton = document.createElement('button');
-            selectButton.textContent = '選擇';
+            const selectButton = document.createElement('select-btn');
+            selectButton.textContent = '選取';
+            selectButton.classList.add('select-btn'); // 添加自定義類
             selectButton.onclick = async () => {
                 selectPractice(practice._id); // 儲存當前練習 ID
                 await loadPracticeDetails(practice._id); // 加載練習詳細資訊
                 
+                
             };
 
             // 添加刪除按鈕
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'X';
+            const deleteButton = document.createElement('small-btn');
+            deleteButton.textContent = '刪除';
+            deleteButton.classList.add('small-btn'); // 添加自定義類
             deleteButton.onclick = async (e) => {
                 e.stopPropagation(); // 防止點擊刪除按鈕時觸發列表項點擊事件
                 if (confirm('確認刪除此練習紀錄？')) {
                     await deletePractice(practice._id); // 刪除該練習
+                    location.reload(); 
                 }
             };
 
@@ -221,11 +242,14 @@ let currentPracticeId = null;
     if (data.success) {
       currentPracticeId = data.practice._id;
       loadPractices();
-      alert('練習已建立，請點擊"開始練習"開始對話');
+      alert('練習已建立，請點擊"選取"進入練習');
       return currentPracticeId;
     }
     return null;
 }
+
+
+
 
   // 頁面載入時初始化
   document.getElementById('newPracticeBtn').addEventListener('click', createPractice);
@@ -580,10 +604,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPractices();
     currentPracticeId = localStorage.getItem('currentPracticeId');
 
+
+
     if (currentPracticeId) {
         await loadPracticeDetails(currentPracticeId);
         await loadRecordingsHistory(currentPracticeId);
     }
+
+    
+    alert('請先選擇溝通技巧，再新增練習');
+    
 });
 
 // 分析相關函數

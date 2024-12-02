@@ -142,6 +142,8 @@ button {
     transition: background-color 0.3s;
 }
 
+
+
 button:hover {
     background-color: #45a049;
 }
@@ -150,6 +152,46 @@ button:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
 }
+
+.select-btn {
+    
+    color: #45a049; /* 字體顏色 */
+    border: none; /* 移除邊框 */
+    cursor: pointer; /* 鼠標移上去顯示按鈕手勢 */
+    transition: background-color 0.3s; /* 添加過渡效果 */
+    font-size: 14px; /* 縮小字體 */
+    border-radius: 1px; /* 添加圓角 */
+    margin: 0 5px; /* 按鈕之間的間距 */
+}
+
+.select-btn:hover {
+    background-color: #45a049; /* 鼠標懸停時變深綠色 */
+    color: #ffffff;
+}
+
+.small-btn {
+    
+    color: #f4431c; /* 字體顏色 */
+    border: none; /* 移除邊框 */
+    cursor: pointer; /* 鼠標移上去顯示按鈕手勢 */
+    transition: background-color 0.3s; /* 添加過渡效果 */
+    font-size: 14px; /* 縮小字體 */
+    border-radius: 1px; /* 添加圓角 */
+    margin: 0 5px; /* 按鈕之間的間距 */
+}
+
+.small-btn:hover {
+    background-color: #f86d4d; /* 鼠標懸停時變深綠色 */
+    color: #ffffff;
+}
+
+#practiceList li {
+    margin: 10px 0; /* 上下間距 */
+    padding: 5px; /* 內邊距 */
+    border-radius: 5px; /* 圓角 */
+    list-style: none; /* 移除預設的列表樣式 */
+}
+
 
 /* 錄音控制樣式 */
 .record-controls {
