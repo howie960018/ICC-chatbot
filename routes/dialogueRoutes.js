@@ -11,75 +11,12 @@ const { updatePractice } = require('../services/practiceService'); // 匯入練�
 const { resetDialogueState, updateDialogueState, getDialogueState } = require('../services/dialogueService'); // 匯入對話狀態管理
 const { generateChatResponse } = require('../services/openaiService'); // 匯入 OpenAI API 工具
 
-/**
- * POST /start-dialogue
- * 初始化一個新的對話，生成情境、教師建議，並與練習紀錄關聯。
- */
-// router.post('/start-dialogue', async (req, res) => {
-//   try {
-//     const { technique, practiceId } = req.body; // 從請求中提取溝通技巧和練習 ID
-//     if (!technique || !practiceId) {
-//       // 若缺少必要參數，拋出錯誤
-//       throw new Error('Technique or practiceId not specified');
-//     }
-
-//     // 重置對話狀態，並設置當前溝通技巧
-//     resetDialogueState(technique);
-
-//     // 隨機選擇一個情境
-//     const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-//     console.log('Selected scenario:', randomScenario); // 調試用
-
-//     // 根據情境生成初始消息
-//     const initialMessage = createInitialMessage(randomScenario);
-//     console.log('Initial message created:', initialMessage); // 調試用
-
-//     // 與 OpenAI 進行交互，獲取 AI 的初始回應
-//     const response = await generateChatResponse([{ role: "user", content: initialMessage }]);
-//     console.log('AI response received:', response); // 調試用
-
-//     // 將 AI 回應解析為情境細節和教師建議
-//     const parsedResponse = parseInitialResponse(response);
-//     if (!parsedResponse) {
-//       throw new Error('Failed to parse AI response');
-//     }
-
-//     const { scenario, teacherSuggestion, firstResponse } = parsedResponse;
-
-//     // 更新對話狀態
-//     updateDialogueState({
-//       scenario, // 保存情境
-//       history: [{ role: "家長", content: firstResponse }], // 初始對話記錄
-//       count: 1 // 對話回合計數
-//     });
-
-//     // 更新練習紀錄：保存情境與教師建議
-//     await updatePractice(practiceId, { scenario, teacherSuggestion });
-
-//     // 返回初始化成功的訊息
-//     res.json({
-//       success: true,
-//       scenario, // 回傳情境
-//       teacherSuggestion, // 回傳教師建議
-//       response: firstResponse // 回傳 AI 的初始回應
-//     });
-
-//   } catch (error) {
-//     // 捕捉所有錯誤，並回傳錯誤訊息
-//     console.error('Error in start-dialogue:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message || 'An error occurred while starting the dialogue'
-//     });
-//   }
-// });
-
 router.post('/start-dialogue', async (req, res) => {
   try {
-      const { technique, practiceId } = req.body;
+      const { technique, practiceId, difficulty } = req.body;
 
       // 檢查必要參數
-      if (!technique || !practiceId) {
+      if (!technique || !practiceId || !difficulty) {
           console.error('缺少溝通技巧或練習 ID:', { technique, practiceId });
           throw new Error('Technique or practiceId not specified');
       }
@@ -92,12 +29,21 @@ router.post('/start-dialogue', async (req, res) => {
       // 重置對話狀態
       resetDialogueState(technique);
 
+      const parentPersonalities = difficulty === '挑戰' 
+          ? ['相信孩子，較自我中心', '完全無法接受他人觀點或建議']
+          : ['能同理老師', '有點情緒但算明理'];
+
+      // 隨機選擇家長個性
+      const selectedPersonality = parentPersonalities[Math.floor(Math.random() * parentPersonalities.length)];
+
+
+
       // 隨機選擇情境
       const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
       console.log('Selected scenario:', randomScenario);
 
       // 生成初始消息
-      const initialMessage = createInitialMessage(randomScenario);
+      const initialMessage = createInitialMessage(randomScenario,selectedPersonality);
       console.log('Initial message created:', initialMessage);
 
       // 與 OpenAI API 交互
@@ -112,6 +58,7 @@ router.post('/start-dialogue', async (req, res) => {
       }
 
       const { scenario, teacherSuggestion, firstResponse } = parsedResponse;
+
 
       // 更新對話狀態
       updateDialogueState({
@@ -150,7 +97,7 @@ router.post('/start-dialogue', async (req, res) => {
 
 
 // 輔助函數
-function createInitialMessage(scenario) {
+function createInitialMessage(scenario,parentPersonality) {
   return `
     請生成以下兩個部分：
     1. 情境內容以及家長的第一句話
@@ -161,16 +108,19 @@ function createInitialMessage(scenario) {
     情境內容：
     ${scenario}
 
-    你可以選擇扮演：
-    1. 能同理老師的明理家長，
-    2. 有點情緒但算明理的家長，
-    3. 相信孩子，較自我中心，但還能溝通的家長，
-    4. 完全無法接受他人觀點或建議，只想找情緒出口的家長。（四選一）
+    家長個性: 
+    ${parentPersonality}
+
+    你可以根據家長的個性做對應的回應
 
     請按照以下格式回應：
 
     情境內容：
     [描述情境]
+
+    家長個性: 
+    ${parentPersonality}
+    
 
     根據情境，老師對家長說的第一句話：
     [老師建議的開場白]
@@ -220,6 +170,8 @@ function parseInitialResponse(response) {
             throw new Error('對話狀態丟失或無效');
         }
 
+        const parentPersonality = dialogueState.parentPersonality;
+
         // 添加導師的回應到對話歷史
         addToHistory({ role: "導師", content: userResponse });
         incrementCount();
@@ -236,8 +188,16 @@ function parseInitialResponse(response) {
             return res.json({ completed: true, analysis });
         }
 
+        const systemMessage = `請用繁體中文根據老師上一句的回應回覆，你是一名${parentPersonality}的家長，
+        如果家長個性是"完全無法接受他人觀點或建議"的家長，無論老師的回應多麼得體，請表現出以下行為：
+        1. 強烈質疑老師的立場，認為老師無法理解你孩子的真正狀況。
+        2. 始終堅持自己孩子無錯，並試圖將問題歸因於外部原因（如其他孩子或老師的處理方式）。
+        3. 對老師的建議表現出冷漠甚至敵意，不願積極配合。
+        4. 語氣不必粗暴，但需保持疏離、不合作或消極抵抗。
+        `;
+
         const messages = [
-            { role: "system", content: "請用繁體中文..." },
+            { role: "system", content: systemMessage },
             ...dialogueState.history.map(entry => ({
                 role: entry.role === "家長" ? "assistant" : "user",
                 content: entry.content
@@ -255,88 +215,7 @@ function parseInitialResponse(response) {
     }
 });
 
-  
-// router.post('/continue-dialogue', async (req, res) => {
-//   // try {
-//   //   const { userResponse } = req.body;
-//   //   const dialogueState = getDialogueState();
-    
-//   //   addToHistory({ role: "導師", content: userResponse });
-//   //   incrementCount();
-
-//   //   if (dialogueState.count >= 6) {
-//   //     return await analyzeDialogue(res);
-//   //   }
-
-//   //   const messages = [
-//   //     { 
-//   //       role: "system", 
-//   //       content: "請用繁體中文根據老師上一句的回應回覆，繼續保持情緒激動及不客氣，如果您對老師回復不滿意，可以更生氣 或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。" 
-//   //     },
-//   //     ...dialogueState.history.map(entry => ({ 
-//   //       role: entry.role === "家長" ? "assistant" : "user", 
-//   //       content: entry.content 
-//   //     }))
-//   //   ];
-
-//   //   const response = await generateChatResponse(messages);
-    
-//   //   addToHistory({ role: "家長", content: response });
-//   //   incrementCount();
-    
-//   //   res.json({ response });
-//   // } catch (error) {
-//   //   console.error('Error:', error);
-//   //   res.status(500).json({ error: error.message });
-//   // }
-
-//       try {
-
-//         const { userResponse, practiceId } = req.body;
-
-//         if (!practiceId) {
-//             throw new Error('練習 ID 缺失');
-//         }
-
-//         const dialogueState = getDialogueState();
-
-//         if (!dialogueState) {
-//             throw new Error('對話狀態丟失');
-//         }
-
-//         addToHistory({ role: "導師", content: userResponse });
-//         incrementCount();
-
-//         if (dialogueState.count >= 6) {
-//             const practiceId = req.body.practiceId; // 確保 practiceId 傳遞正確
-//             if (!practiceId) {
-//                 throw new Error('練習 ID 缺失');
-//             }
-
-//             const analysis = await analyzeDialogue(practiceId);
-//             return res.json({ completed: true, analysis });
-//         }
-
-//         const messages = [
-//             { role: "system", content: "請用繁體中文根據老師上一句的回應回覆，繼續保持情緒激動及不客氣，如果您對老師回復不滿意，可以更生氣 或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應" },
-//             ...dialogueState.history.map(entry => ({
-//                 role: entry.role === "家長" ? "assistant" : "user",
-//                 content: entry.content
-//             }))
-//         ];
-
-//         const response = await generateChatResponse(messages);
-//         addToHistory({ role: "家長", content: response });
-//         incrementCount();
-
-//         res.json({ response });
-//     } catch (error) {
-//         console.error('Error in continue-dialogue:', error.message || error);
-//         res.status(500).json({ error: error.message });
-
-//     }
-// });
-// Export the router
+ 
 module.exports = router;
 
 

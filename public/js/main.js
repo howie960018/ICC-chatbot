@@ -115,13 +115,18 @@ function displayPracticeDetails(practice) {
     `;
 
 
+
+    analysisContent.innerHTML = '';
+
     if (practice.analysis) {
         // 將分析內容按段落分割
         const paragraphs = practice.analysis.split(/(?<=。)\s/); // 按句號+空格切分段落
 
         paragraphs.forEach(paragraph => {
+
+            const cleanedParagraph = paragraph.replace(/[#*]/g, '').trim();
             const paragraphElement = document.createElement('p');
-            paragraphElement.textContent = paragraph.trim();
+            paragraphElement.textContent = cleanedParagraph;
             analysisContent.appendChild(paragraphElement);
         });
     } else {
@@ -178,7 +183,7 @@ function displayPracticeDetails(practice) {
         data.practices.forEach(practice => {
             // 創建列表項目
             const listItem = document.createElement('li');
-            listItem.textContent = `${new Date(practice.createdAt).toLocaleDateString('zh-TW')}`;
+            listItem.textContent = `${practice.technique}-${new Date(practice.createdAt).toLocaleDateString('zh-TW')} `;
 
             // 添加選擇按鈕
             const selectButton = document.createElement('select-btn');
@@ -461,6 +466,9 @@ async function startDialogue() {
     try {
         // 檢查是否有選擇溝通技巧
         const technique = techniqueSelect.value;
+
+        const difficulty = document.getElementById('difficultySelect').value; // 獲取難度
+
         if (!technique) {
             throw new Error('請選擇溝通技巧');
         }
@@ -478,6 +486,7 @@ async function startDialogue() {
             },
             body: JSON.stringify({ 
                 technique,
+                difficulty,
                 practiceId: currentPracticeId
             }),
         });
