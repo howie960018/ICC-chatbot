@@ -8,8 +8,10 @@ const stopRecordBtn = document.getElementById('stopRecordBtn');
 const recordStatus = document.getElementById('recordStatus');
 const analysisContent = document.getElementById('analysisContent');
 const practiceSelect = document.getElementById('select-btn');
+const difficultySelect = document.getElementById('difficultySelect'); 
 
 // 全局變數
+let countdownTimer = null; 
 let mediaRecorder = null;
 let audioChunks = [];
 let dialogueCount = 0;
@@ -18,6 +20,7 @@ let submissionTimer = null;
 let currentDialogueRecordings = [];
 let isRecording = false;
 const maxDialogues = 6;
+const MAX_RECORDING_TIME = 20 * 1000; // 最大錄音時間，這裡設定為 20 秒
 let currentAccumulatedText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -109,9 +112,12 @@ function displayPracticeDetails(practice) {
 
     // 示例：顯示練習溝通技巧和分析結果
     const techniqueDisplay = document.getElementById('scenarioDisplay');
+
     techniqueDisplay.innerHTML = `
         <p><strong>⭐ 溝通技巧：</strong>${practice.technique}</p>
+        <p><strong>模式：</strong>${practice.difficulty || '簡單'}</p>
         <p><strong>📖 情境：</strong>${practice.scenario}</p>
+
     `;
 
 
@@ -227,6 +233,8 @@ let currentPracticeId = null;
   async function createPractice() {
 
     const technique = techniqueSelect.value;
+    const difficulty = difficultySelect.value;
+
     if (!technique) {
         alert('請先選擇溝通技巧');
         return null;
@@ -240,7 +248,7 @@ let currentPracticeId = null;
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ technique })
+      body: JSON.stringify({ technique, difficulty })
     });
     const data = await response.json();
   
@@ -299,12 +307,25 @@ startRecordBtn.addEventListener('click', async () => {
         };
 
         mediaRecorder.onstop = async () => {
+
+
             isRecording = false;
             startRecordBtn.disabled = false;
             stopRecordBtn.disabled = true;
-            
+
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             recordStatus.textContent = '處理中...請稍候';
+
+            // 停止計時器和倒計時（如果有啟動）
+            if (recordingTimer) {
+                clearTimeout(recordingTimer);
+                recordingTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                recordStatus.textContent = ''; // 清除倒計時顯示
+            }
             
             try {
 
@@ -348,22 +369,22 @@ startRecordBtn.addEventListener('click', async () => {
                 
                 if (!isWaitingForSubmission) {
                     isWaitingForSubmission = true;
-                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，2秒後AI將回應';
+                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
                     startRecordBtn.disabled = false;
                     
                     submissionTimer = setTimeout(async () => {
                         await handleSubmission(currentAccumulatedText);
                         currentAccumulatedText = '';
-                    }, 2000);
+                    }, 5000);
                 } else {
                     clearTimeout(submissionTimer);
                     startRecordBtn.disabled = false;
-                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，2秒後AI將回應';
+                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
                     
                     submissionTimer = setTimeout(async () => {
                         await handleSubmission(currentAccumulatedText);
                         currentAccumulatedText = '';
-                    }, 2000);
+                    }, 5000);
                 }
                 
                 await loadRecordingsHistory();
@@ -390,6 +411,33 @@ startRecordBtn.addEventListener('click', async () => {
         stopRecordBtn.disabled = false;
         recordStatus.textContent = '錄音中...';
         audioPlayback.style.display = 'none';
+
+                // 啟動挑戰模式的計時器和倒計時
+                const difficulty = document.getElementById('difficultySelect').value; // 獲取難度
+                if (difficulty === '挑戰') {
+                    let remainingTime = MAX_RECORDING_TIME / 1000; // 剩餘時間，轉換為秒
+        
+                    // 更新顯示倒計時
+                    recordStatus.textContent = `剩餘時間：${remainingTime} 秒`;
+        
+                    countdownTimer = setInterval(() => {
+                        remainingTime -= 1;
+                        recordStatus.textContent = `剩餘時間：${remainingTime} 秒`;
+        
+                        if (remainingTime <= 0) {
+                            clearInterval(countdownTimer);
+                            countdownTimer = null;
+                        }
+                    }, 1000);
+        
+                    recordingTimer = setTimeout(() => {
+                        if (mediaRecorder && isRecording) {
+                            mediaRecorder.stop(); // 自動停止錄音
+                            recordStatus.textContent = '錄音時間已到，正在提交...';
+                        }
+                    }, MAX_RECORDING_TIME);
+                }
+
     } catch (err) {
         recordStatus.textContent = '無法存取麥克風：' + err.message;
         console.error('麥克風存取錯誤:', err);
@@ -400,7 +448,29 @@ startRecordBtn.addEventListener('click', async () => {
     }
 });
 
+// 溝通技巧的簡短介紹
+const techniqueIntroductions = {
+    "我訊息": `
+        <h3>我訊息</h3>
+        <p>我訊息是一種強調自己感受和觀點的溝通技巧，透過清楚描述問題、表達感受和提出期待，減少指責對方的可能性。例如：「當你遲到時，我感到很擔心，因為我希望我們可以按時完成計劃。」</p>
+    `,
+    "三明治溝通法": `
+        <h3>三明治溝通法</h3>
+        <p>三明治溝通法通過「正面肯定 - 建設性回饋 - 正面鼓勵」的方式表達意見，減少對方的抗拒心理。例如：「你最近表現很棒，我想我們可以一起改進報告的格式，這樣會更完美，你有這樣的潛力！」</p>
+    `,
+    "綜合溝通技巧": `
+        <h3>綜合溝通技巧</h3>
+        <p>綜合溝通技巧包含積極傾聽、同理心、清晰表達、雙向溝通和解決問題導向，幫助建立信任和有效合作。例如：「我理解你的感受，我們一起來想想有什麼解決方案。」</p>
+    `
+};
 
+// 處理點擊溝通技巧按鈕的邏輯
+function selectPracticeByTechnique(technique) {
+    const introDiv = document.getElementById('techniqueIntro');
+    introDiv.innerHTML = techniqueIntroductions[technique];
+    introDiv.style.display = "block";
+    introDiv.scrollIntoView({ behavior: "smooth", block: "center" }); // 平滑滾動到介紹部分
+}
 function handleApiError(error, defaultMessage = '發生錯誤') {
     console.error('API 錯誤:', error);
     
@@ -446,6 +516,20 @@ stopRecordBtn.addEventListener('click', () => {
             startRecordBtn.disabled = false;
             stopRecordBtn.disabled = true;
             recordStatus.textContent = '停止錄音...';
+
+            // 清理挑戰模式的計時器和倒計時
+            if (recordingTimer) {
+                clearTimeout(recordingTimer);
+                recordingTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                recordStatus.textContent = ''; // 清除倒計時顯示
+            }
+
+
+
         } catch (error) {
             console.error('停止錄音時發生錯誤:', error);
             recordStatus.textContent = '停止錄音時發生錯誤';
@@ -466,8 +550,9 @@ async function startDialogue() {
     try {
         // 檢查是否有選擇溝通技巧
         const technique = techniqueSelect.value;
+        const difficulty = difficultySelect.value;
 
-        const difficulty = document.getElementById('difficultySelect').value; // 獲取難度
+        
 
         if (!technique) {
             throw new Error('請選擇溝通技巧');

@@ -72,7 +72,9 @@ const UserSchema = new mongoose.Schema({
       ],
       analysis: {
         type: String // 分析結果文字（選填）
-      }
+      },
+
+      difficulty: { type: String, enum: ['簡單', '挑戰'], default: '簡單' }
     }
   ]
 });

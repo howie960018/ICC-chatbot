@@ -31,7 +31,7 @@ router.post('/start-dialogue', async (req, res) => {
 
       const parentPersonalities = difficulty === '挑戰' 
           ? ['相信孩子，較自我中心', '完全無法接受他人觀點或建議']
-          : ['能同理老師', '有點情緒但算明理'];
+          : ['有點情緒但算明理'];
 
       // 隨機選擇家長個性
       const selectedPersonality = parentPersonalities[Math.floor(Math.random() * parentPersonalities.length)];
@@ -118,8 +118,8 @@ function createInitialMessage(scenario,parentPersonality) {
     情境內容：
     [描述情境]
 
-    家長個性: 
-    ${parentPersonality}
+    (換行)家長個性: 
+    ${parentPersonality} (粗體表示)
     
 
     根據情境，老師對家長說的第一句話：

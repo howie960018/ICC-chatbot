@@ -192,6 +192,41 @@ button:disabled {
     list-style: none; /* 移除預設的列表樣式 */
 }
 
+.technique-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.technique-options button {
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.technique-options button:hover {
+    background-color: #45a049;
+}
+
+#techniqueIntro {
+    background-color: #fefefe;
+    border-left: 4px solid #4CAF50;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 
 /* 錄音控制樣式 */
 .record-controls {

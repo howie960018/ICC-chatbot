@@ -12,6 +12,7 @@ const {
 router.get('/practices', async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('接收到的請求數據:', req.body); 
     const practices = await getPractices(userId);
     res.json({ success: true, practices });
   } catch (error) {

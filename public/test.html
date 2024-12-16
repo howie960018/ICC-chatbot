@@ -15,6 +15,14 @@
     <div class="container">
 
         <div id="practiceSidebar" class="recordings-sidebar">
+            <!-- 新增顯示區域 -->
+            <div class="technique-options">
+                <button onclick="selectPracticeByTechnique('我訊息')">我訊息</button>
+                <button onclick="selectPracticeByTechnique('三明治溝通法')">三明治溝通法</button>
+                <button onclick="selectPracticeByTechnique('綜合溝通技巧')">綜合溝通技巧</button>
+            </div>
+
+
             <div class="recordings-title">練習紀錄</div>
             <ul id="practiceList"></ul>
             <button id="newPracticeBtn">新增練習</button>
@@ -22,6 +30,8 @@
         
           
         <div class="main-section">
+
+            <div id="techniqueIntro" class="panel" style="display: none;"></div>
             <div class="panel">
                 <select id="techniqueSelect">
                     <option value="我訊息">我訊息</option>
