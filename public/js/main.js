@@ -294,21 +294,21 @@ let currentPracticeId = null;
 
 // 錄音功能
 startRecordBtn.addEventListener('click', async () => {
-    if (isWaitingForSubmission) {
+    if (isWaitingForSubmission && submissionTimer) {
         clearTimeout(submissionTimer);
+        submissionTimer = null;
     }
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
-        
+        audioChunks = [];
+
         mediaRecorder.ondataavailable = (event) => {
             audioChunks.push(event.data);
         };
 
         mediaRecorder.onstop = async () => {
-
-
             isRecording = false;
             startRecordBtn.disabled = false;
             stopRecordBtn.disabled = true;
@@ -316,19 +316,7 @@ startRecordBtn.addEventListener('click', async () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             recordStatus.textContent = '處理中...請稍候';
 
-            // 停止計時器和倒計時（如果有啟動）
-            if (recordingTimer) {
-                clearTimeout(recordingTimer);
-                recordingTimer = null;
-            }
-            if (countdownTimer) {
-                clearInterval(countdownTimer);
-                countdownTimer = null;
-                recordStatus.textContent = ''; // 清除倒計時顯示
-            }
-            
             try {
-
                 if (!currentPracticeId) {
                     throw new Error('未選擇練習 ID，請先建立或選擇一個練習');
                 }
@@ -336,117 +324,73 @@ startRecordBtn.addEventListener('click', async () => {
                 const formData = new FormData();
                 formData.append('audio', audioBlob);
                 formData.append('practiceId', currentPracticeId);
-        
-                // 添加認證 header
+
                 const response = await fetch('/api/audio/transcribe', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
-                        // 注意：這裡不要設置 'Content-Type'，因為 FormData 會自動設置
                     },
                     body: formData
                 });
-        
-                // 處理未認證的情況
+
                 if (response.status === 401) {
                     window.location.href = '/login';
                     return;
                 }
-        
+
                 if (!response.ok) {
                     throw new Error('轉錄 API 請求失敗');
                 }
-        
+
                 const data = await response.json();
                 const transcribedText = data.text;
                 console.log('轉錄文字:', transcribedText);
-                
-                currentAccumulatedText = currentAccumulatedText 
-                    ? currentAccumulatedText + ' ' + transcribedText 
-                    : transcribedText;
-                
+
+                currentAccumulatedText = `${currentAccumulatedText.trim()} ${transcribedText}`.trim();
                 updateTranscriptionPreview(currentAccumulatedText);
-                
-                if (!isWaitingForSubmission) {
-                    isWaitingForSubmission = true;
-                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
-                    startRecordBtn.disabled = false;
-                    
-                    submissionTimer = setTimeout(async () => {
-                        await handleSubmission(currentAccumulatedText);
-                        currentAccumulatedText = '';
-                    }, 5000);
-                } else {
-                    clearTimeout(submissionTimer);
-                    startRecordBtn.disabled = false;
-                    recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
-                    
-                    submissionTimer = setTimeout(async () => {
-                        await handleSubmission(currentAccumulatedText);
-                        currentAccumulatedText = '';
-                    }, 5000);
+                        // 清除之前的計時器
+        if (submissionTimer) {
+            clearTimeout(submissionTimer);
+        }
+
+        // 設定新的計時器
+        recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
+        isWaitingForSubmission = true;
+        
+        submissionTimer = setTimeout(async () => {
+            try {
+                if (currentAccumulatedText.trim().length > 0) {
+                    await handleSubmission(currentAccumulatedText);
                 }
-                
-                await loadRecordingsHistory();
+            } catch (error) {
+                console.error('提交處理錯誤:', error);
+                recordStatus.textContent = '處理錯誤，請重試';
+            } finally {
+                currentAccumulatedText = '';
+                isWaitingForSubmission = false;
+            }
+        }, 5000);
+
                 
             } catch (error) {
                 console.error('轉錄錯誤：', error);
-                
-                // 根據錯誤類型顯示不同的錯誤信息
-                if (error.message === '轉錄失敗') {
-                    recordStatus.textContent = '轉錄失敗，請重試';
-                } else {
-                    recordStatus.textContent = '發生錯誤：' + error.message;
-                }
-                
-                startRecordBtn.disabled = false;
+                recordStatus.textContent = '發生錯誤：' + error.message;
             }
         };
-        
+
         mediaRecorder.start();
         isRecording = true;
-        audioChunks = [];
-        
+
         startRecordBtn.disabled = true;
         stopRecordBtn.disabled = false;
         recordStatus.textContent = '錄音中...';
-        audioPlayback.style.display = 'none';
-
-                // 啟動挑戰模式的計時器和倒計時
-                const difficulty = document.getElementById('difficultySelect').value; // 獲取難度
-                if (difficulty === '挑戰') {
-                    let remainingTime = MAX_RECORDING_TIME / 1000; // 剩餘時間，轉換為秒
-        
-                    // 更新顯示倒計時
-                    recordStatus.textContent = `剩餘時間：${remainingTime} 秒`;
-        
-                    countdownTimer = setInterval(() => {
-                        remainingTime -= 1;
-                        recordStatus.textContent = `剩餘時間：${remainingTime} 秒`;
-        
-                        if (remainingTime <= 0) {
-                            clearInterval(countdownTimer);
-                            countdownTimer = null;
-                        }
-                    }, 1000);
-        
-                    recordingTimer = setTimeout(() => {
-                        if (mediaRecorder && isRecording) {
-                            mediaRecorder.stop(); // 自動停止錄音
-                            recordStatus.textContent = '錄音時間已到，正在提交...';
-                        }
-                    }, MAX_RECORDING_TIME);
-                }
 
     } catch (err) {
         recordStatus.textContent = '無法存取麥克風：' + err.message;
         console.error('麥克風存取錯誤:', err);
-        
-        isRecording = false;
-        startRecordBtn.disabled = false;
-        stopRecordBtn.disabled = true;
     }
 });
+
 
 // 溝通技巧的簡短介紹
 const techniqueIntroductions = {
@@ -547,12 +491,14 @@ async function startDialogue() {
         return;
     }
 
+    enableUserInput();
+
     try {
         // 檢查是否有選擇溝通技巧
         const technique = techniqueSelect.value;
         const difficulty = difficultySelect.value;
 
-        
+        dialogueCount = 0; // 重置對話計數
 
         if (!technique) {
             throw new Error('請選擇溝通技巧');
@@ -599,6 +545,7 @@ async function startDialogue() {
                 <div class="message-time" style="text-align: left">${new Date().toLocaleTimeString()}</div>
             </div>
         `;
+        
 
     } catch (error) {
         console.error('開始對話失敗:', error);
@@ -647,25 +594,37 @@ function clearTranscriptionPreview() {
     }
 }
 
-
 function updateDialogueDisplay(speaker, message) {
+    if (!message || !message.trim()) return;
+
+    // 創建新的訊息元素
     const messageDiv = document.createElement('div');
     const speakerType = speaker.toLowerCase() === 'teacher' || speaker === '老師' ? '老師' : '家長';
     messageDiv.className = `message ${speakerType}`;
     
+    // 設定適當的圖標和對齊方式
     const icon = speakerType === '老師' ? '👩‍🏫' : '👤';
+    const alignment = speakerType === '老師' ? 'right' : 'left';
     
+    // 構建訊息內容
     messageDiv.innerHTML = `
-        <div class="message-header" style="text-align: ${speakerType === '老師' ? 'right' : 'left'}">${icon} ${speakerType}</div>
+        <div class="message-header" style="text-align: ${alignment}">
+            ${icon} ${speakerType}
+        </div>
         <div class="message-content">${message}</div>
-        <div class="message-time" style="text-align: ${speakerType === '老師' ? 'right' : 'left'}">${new Date().toLocaleTimeString()}</div>
+        <div class="message-time" style="text-align: ${alignment}">
+            ${new Date().toLocaleTimeString()}
+        </div>
     `;
     
+    // 添加到對話顯示區域
     dialogueDisplay.appendChild(messageDiv);
-    dialogueCount++;
     
-    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    // 更新對話計數並滾動到最新訊息
+    dialogueCount++;
+    messageDiv.scrollIntoView({ behavior: 'smooth' });
 }
+
 
 // 用戶輸入控制
 function disableUserInput() {
@@ -763,51 +722,64 @@ async function loadRecordingsHistory(practiceId) {
 }
 
 async function handleSubmission(text) {
-    isWaitingForSubmission = false;
-    recordStatus.textContent = '正在等待 AI 回應...';
-    
     try {
-        // 移除預覽，添加正式消息
-        clearTranscriptionPreview();
-        updateDialogueDisplay("老師", text);
+        // 1. 先清除狀態
+        isWaitingForSubmission = false;
+        clearTranscriptionPreview();  // 清除預覽
         
+        // 2. 更新狀態顯示
+        recordStatus.textContent = '正在等待 AI 回應...';
+        
+        if (!text || text.trim().length === 0) {
+            throw new Error('提交的文字內容為空');
+        }
+
+        // 3. 先顯示老師的回應 - 這是關鍵步驟
+        updateDialogueDisplay("老師", text);
+
+        // 4. 發送請求到後端
         const response = await fetch('/api/dialogue/continue-dialogue', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 userResponse: text,
-                practiceId: currentPracticeId // 確保包含練習 ID
+                practiceId: currentPracticeId
             })
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('API 請求失敗');
         }
 
         const data = await response.json();
         
+        // 5. 處理回應
         if (data.completed && data.analysis) {
+            // 對話結束，顯示分析結果
             analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
             disableUserInput();
         } else if (data.response) {
+            // 顯示家長回應並檢查是否需要繼續對話
             updateDialogueDisplay("家長", data.response);
-            if (dialogueCount < maxDialogues) {
-                enableUserInput();
-            } else {
-                disableUserInput();
-                showEndDialogueMessage();
-            }
+            dialogueCount >= 6 ? disableUserInput() : enableUserInput();
         }
-        
+
+        // 6. 清理狀態
         currentAccumulatedText = '';
         recordStatus.textContent = '';
         
+        // 7. 如果對話結束，顯示結束訊息
+        if (dialogueCount >= 6) {
+            showEndDialogueMessage();
+        }
+
     } catch (error) {
-        console.error('提交對話錯誤:', error);
-        recordStatus.textContent = `提交對話時發生錯誤: ${error.message}`;
+        console.error('對話提交錯誤:', error);
+        recordStatus.textContent = `錯誤：${error.message}`;
+        enableUserInput();  // 發生錯誤時允許重試
     }
 }
   

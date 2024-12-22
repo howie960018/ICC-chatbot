@@ -160,6 +160,7 @@ function parseInitialResponse(response) {
   router.post('/continue-dialogue', async (req, res) => {
     try {
         const { userResponse, practiceId } = req.body;
+        console.log("收到請求：", req.body);
 
         if (!practiceId) {
             throw new Error('練習 ID 缺失');
