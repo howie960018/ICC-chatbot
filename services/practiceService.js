@@ -120,6 +120,7 @@ async function createPractice(userId, newPractice) {
     }
 
     const practice = {
+      _id: new mongoose.Types.ObjectId(),
       createdAt: new Date(),
       technique: newPractice.technique || '未指定技巧',
       difficulty: newPractice.difficulty || '簡單',
@@ -131,7 +132,9 @@ async function createPractice(userId, newPractice) {
     user.practices.push(practice);
     await user.save();
 
-    return practice;
+    // 返回完整的練習對象（包含 _id）
+    return practice;  // 轉換為普通對象
+
   } catch (error) {
     console.error('Error creating practice:', error);
     throw error;

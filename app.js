@@ -1,12 +1,12 @@
 // app.js
 
 const os = require('os');
-console.log('CPU 信息:', os.cpus());
-console.log('總內存:', (os.totalmem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
-console.log('可用內存:', (os.freemem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
-console.log('伺服器運行時間:', (os.uptime() / 3600).toFixed(2), '小時');
-console.log('主機名稱:', os.hostname());
-console.log('平台:', os.platform());
+// console.log('CPU 信息:', os.cpus());
+// console.log('總內存:', (os.totalmem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
+// console.log('可用內存:', (os.freemem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
+// console.log('伺服器運行時間:', (os.uptime() / 3600).toFixed(2), '小時');
+// console.log('主機名稱:', os.hostname());
+// console.log('平台:', os.platform());
 
 const express = require('express');
 const bodyParser = require('body-parser');

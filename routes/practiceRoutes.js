@@ -12,7 +12,7 @@ const {
 router.get('/practices', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log('接收到的請求數據:', req.body); 
+    
     const practices = await getPractices(userId);
     res.json({ success: true, practices });
   } catch (error) {
@@ -25,7 +25,12 @@ router.post('/practices', async (req, res) => {
   try {
     const userId = req.user.id;
     const practice = await createPractice(userId, req.body);
-    res.status(201).json({ success: true, practice });
+
+    if (!practice || !practice._id) {
+      throw new Error('練習創建失敗：無法生成練習ID');
+    }
+
+    res.status(201).json({ success: true, practice,message: '練習創建成功' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

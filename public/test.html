@@ -14,6 +14,10 @@
     
     <div class="container">
 
+        <div id="loadingSpinner" class="spinner-overlay">
+            <div class="spinner"></div>
+        </div>
+
         <div id="practiceSidebar" class="recordings-sidebar">
             <!-- 新增顯示區域 -->
             <div class="technique-options">
@@ -25,7 +29,7 @@
 
             <div class="recordings-title">練習紀錄</div>
             <ul id="practiceList"></ul>
-            <button id="newPracticeBtn">新增練習</button>
+        
         </div>
         
           
@@ -39,7 +43,7 @@
                     <option value="綜合溝通技巧">綜合溝通技巧</option>
                 </select>
                 <select id="difficultySelect">
-                    <option value="簡單">簡單模式</option>
+                    <option value="簡單">基礎模式</option>
                     <option value="挑戰">挑戰模式</option>
                 </select>
                 <button id="startPracticeBtn">開始練習</button>
