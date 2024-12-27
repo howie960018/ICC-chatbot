@@ -100,6 +100,8 @@ async function loadPracticeDetails(practiceId) {
 
     if (data.success) {
         displayPracticeDetails(data.practice); // 將返回的練習數據渲染到 UI
+
+        await loadFeedbackList(practiceId); // 自動載入該練習的心得清單
     } else {
         console.error('Failed to load practice details:', data.message);
     }
@@ -598,11 +600,27 @@ function enableUserInput() {
 startPracticeBtn.addEventListener('click', async () => {
    
     try {
+
+         // 清空心得記錄區域
+         const feedbackList = document.getElementById('feedbackList');
+         feedbackList.innerHTML = '尚無心得'; // 清空內容
+
         clearAnalysis(); // 清空之前的分析結果
         console.log('開始建立新練習...'); // 添加日誌
 
         // 清理舊的倒計時器（挑戰模式下需要重新計時）
         resetCountdown();
+
+        // 確定當前模式
+        const difficulty = difficultySelect.value;
+        const countdownDisplay = document.getElementById('countdownDisplay');
+
+        // 簡單模式下隱藏倒計時
+        if (difficulty === '簡單') {
+            countdownDisplay.style.display = 'none';
+        } else if (difficulty === '挑戰') {
+            countdownDisplay.style.display = 'block'; // 挑戰模式下顯示倒計時
+        }
 
         // 啟用「開始錄音」按鈕
         enableUserInput();
@@ -957,5 +975,84 @@ function resetCountdown() {
     const countdownDisplay = document.getElementById('countdownDisplay');
     if (countdownDisplay) {
         countdownDisplay.textContent = '倒計時: 3:00'; // 恢復倒計時初始狀態
+    }
+}
+
+document.getElementById('submitFeedbackBtn').addEventListener('click', async () => {
+    const feedbackInput = document.getElementById('feedbackInput');
+    const feedbackText = feedbackInput.value.trim();
+  
+    if (!feedbackText) {
+      alert('心得內容不可為空！');
+      return;
+    }
+  
+    const token = localStorage.getItem('token');
+    const practiceId = localStorage.getItem('currentPracticeId');
+  
+    console.log('practiceId:', practiceId); // 確認 practiceId
+    console.log('Token:', token); // 確認 Token
+  
+    try {
+      const response = await fetch(`/api/practice/${practiceId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ comment: feedbackText })
+      });
+  
+      const data = await response.json();
+      if (data.success) {
+        feedbackInput.value = ''; // 清空輸入框
+        alert('心得提交成功！');
+        loadFeedbackList(practiceId); // 重新載入心得列表
+      } else {
+        throw new Error(data.message || '提交心得失敗');
+      }
+    } catch (error) {
+      console.error('提交心得失敗:', error);
+      alert('提交心得失敗，請稍後再試。');
+    }
+  });
+  
+
+  async function loadFeedbackList(practiceId) {
+    const feedbackList = document.getElementById('feedbackList');
+    feedbackList.innerHTML = '<p class="no-feedback">載入中...</p>';
+
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`/api/practice/${practiceId}/feedback`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '載入心得失敗');
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            if (data.feedback.length === 0) {
+                feedbackList.innerHTML = '<p class="no-feedback">目前尚無心得紀錄。</p>';
+                return;
+            }
+
+            feedbackList.innerHTML = data.feedback.map(item => `
+                <div class="feedback-item">
+                    <div class="feedback-content">${item.comment}</div>
+                    <div class="feedback-time">${new Date(item.createdAt).toLocaleString('zh-TW')}</div>
+                </div>
+            `).join('');
+        } else {
+            throw new Error(data.message || '載入心得失敗');
+        }
+    } catch (error) {
+        console.error('載入心得失敗:', error);
+        feedbackList.innerHTML = '<p class="no-feedback">載入失敗，請稍後重試。</p>';
     }
 }

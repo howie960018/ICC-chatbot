@@ -74,7 +74,25 @@ const UserSchema = new mongoose.Schema({
         type: String // 分析結果文字（選填）
       },
 
-      difficulty: { type: String, enum: ['簡單', '挑戰'], default: '簡單' }
+      difficulty: { type: String, enum: ['簡單', '挑戰'], default: '簡單' },
+      feedback: [
+        {
+          userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+          },
+          comment: {
+            type: String,
+            required: [true, '回饋內容為必填'],
+            minlength: [1, '回饋內容至少需要1個字元']
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ]
     }
   ]
 });

@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const authMiddleware = require('../middleware/auth');
+const mongoose = require('mongoose');
+const User = require('../models/User'); // 確保引入 User 模型
 const { 
   createPractice, 
   updatePractice, 
@@ -115,6 +118,69 @@ router.delete('/practices/:id', async (req, res) => {
     await deletePractice(userId, practiceId);
     res.json({ success: true, message: '練習已刪除' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/:practiceId/feedback', authMiddleware, async (req, res) => {
+  try {
+    const { practiceId } = req.params;
+    const { comment } = req.body;
+
+    if (!comment) {
+      return res.status(400).json({ success: false, message: '回饋內容為必填' });
+    }
+
+    const user = await User.findOne({ 'practices._id': practiceId });
+    if (!user) {
+      return res.status(404).json({ success: false, message: '找不到該練習記錄' });
+    }
+
+    const practice = user.practices.id(practiceId);
+    if (!practice) {
+      return res.status(404).json({ success: false, message: '練習不存在' });
+    }
+
+    practice.feedback.push({
+      userId: req.user.id,
+      comment,
+      createdAt: new Date()
+    });
+
+    await user.save();
+    res.json({ success: true, message: '心得提交成功' });
+  } catch (error) {
+    console.error('提交心得失敗:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 獲取指定練習的所有心得
+router.get('/:practiceId/feedback', authMiddleware, async (req, res) => {
+  try {
+    const { practiceId } = req.params;
+
+    // 確認練習 ID 格式是否有效
+    if (!mongoose.Types.ObjectId.isValid(practiceId)) {
+      return res.status(400).json({ success: false, message: '無效的練習 ID' });
+    }
+
+    // 查詢包含該練習的使用者
+    const user = await User.findOne({ 'practices._id': practiceId }).select('practices');
+    if (!user) {
+      return res.status(404).json({ success: false, message: '找不到該練習記錄' });
+    }
+
+    // 從練習中提取心得記錄
+    const practice = user.practices.id(practiceId);
+    if (!practice) {
+      return res.status(404).json({ success: false, message: '練習不存在' });
+    }
+
+    const feedback = practice.feedback || [];
+    res.json({ success: true, feedback });
+  } catch (error) {
+    console.error('獲取心得失敗:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

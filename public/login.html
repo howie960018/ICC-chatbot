@@ -153,7 +153,10 @@
 </head>
 <body>
     <div class="container">
+
+        <header class="title">ICC師生溝通建置系統</header>
         <div class="tab-container">
+            
             <div class="tab active" data-form="login">登入</div>
             <div class="tab" data-form="register">註冊</div>
         </div>
@@ -240,8 +243,8 @@
     </div>
 
     <script>
-        // 切換表單的功能
-        document.querySelectorAll('.tab').forEach(tab => {
+                       // 切換表單的功能
+                       document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 // 移除所有active類
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -302,49 +305,6 @@
         }
         return false;
     }
-
-
-        // 註冊處理
-        // async function handleRegister(event) {
-        //     event.preventDefault();
-        //     const loading = document.getElementById('registerLoading');
-        //     const message = document.getElementById('registerMessage');
-            
-        //     loading.classList.add('active');
-        //     message.className = 'message';
-            
-        //     try {
-        //         const response = await fetch('/api/auth/register', {
-        //             method: 'POST',
-        //             headers: {
-        //                 'Content-Type': 'application/json'
-        //             },
-        //             body: JSON.stringify({
-        //                 username: document.getElementById('registerUsername').value,
-        //                 email: document.getElementById('registerEmail').value,
-        //                 password: document.getElementById('registerPassword').value
-        //             })
-        //         });
-
-        //         const data = await response.json();
-                
-        //         if (data.success) {
-        //             message.textContent = '註冊成功！請登入';
-        //             message.classList.add('success');
-        //             setTimeout(() => {
-        //                 document.querySelector('[data-form="login"]').click();
-        //             }, 1500);
-        //         } else {
-        //             throw new Error(data.message || '註冊失敗');
-        //         }
-        //     } catch (error) {
-        //         message.textContent = error.message;
-        //         message.classList.add('error');
-        //     } finally {
-        //         loading.classList.remove('active');
-        //     }
-        //     return false;
-        // }
         async function handleRegister(event) {
         event.preventDefault();
         const loading = document.getElementById('registerLoading');
@@ -401,6 +361,7 @@
 
         // 頁面載入時檢查登入狀態
         checkAuth();
+
     </script>
 </body>
 </html>

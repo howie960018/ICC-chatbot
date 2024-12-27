@@ -37,6 +37,9 @@ app.use('/', pageRoutes);
 app.use('/api/audio', authMiddleware, audioRoutes);
 app.use('/api/dialogue', authMiddleware, dialogueRoutes);
 
+app.use(express.json());
+
+
 // Cleanup old recordings periodically
 setInterval(() => {
   cleanupOldRecordings(recordingsDir, config.recordingsConfig.maxAge);
