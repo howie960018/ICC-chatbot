@@ -12,6 +12,8 @@ const difficultySelect = document.getElementById('difficultySelect');
 
 // 全局變數
 let countdownTimer = null; 
+let challengeTimer = null; // 挑戰倒計時計時器
+let countdownRemaining = 180; // 倒計時剩餘時間（以秒為單位）
 let mediaRecorder = null;
 let audioChunks = [];
 let dialogueCount = 0;
@@ -460,6 +462,8 @@ function checkAuthStatus() {
 
 stopRecordBtn.addEventListener('click', () => {
 
+   
+
 
     if (!checkAuthStatus()) {
         return;
@@ -597,6 +601,12 @@ startPracticeBtn.addEventListener('click', async () => {
         clearAnalysis(); // 清空之前的分析結果
         console.log('開始建立新練習...'); // 添加日誌
 
+        // 清理舊的倒計時器（挑戰模式下需要重新計時）
+        resetCountdown();
+
+        // 啟用「開始錄音」按鈕
+        enableUserInput();
+
         // 先建立練習
         const practiceId = await createPractice();
         console.log('createPractice 返回的 ID:', practiceId); // 添加日誌
@@ -650,7 +660,6 @@ async function startDialogue(practiceId) {
         }); 
 
         // 檢查是否已經有練習記錄
-        
         const response = await fetch('/api/dialogue/start-dialogue', {
             method: 'POST',
             headers: {
@@ -687,7 +696,11 @@ async function startDialogue(practiceId) {
                 <div class="message-time" style="text-align: left">${new Date().toLocaleTimeString()}</div>
             </div>
         `;
-        
+
+        // 啟動挑戰模式倒計時
+        if (difficulty === '挑戰') {
+            startCountdown();
+        }
 
     } catch (error) {
         console.error('開始對話失敗:', error);
@@ -698,11 +711,12 @@ async function startDialogue(practiceId) {
                 <div class="message-content">${error.message}</div>
             </div>
         `;
-    }finally {
+    } finally {
         // 隱藏 loading spinner
         spinner.classList.remove('spinner-visible');
     }
 }
+
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
@@ -779,9 +793,11 @@ async function loadRecordingsHistory(practiceId) {
 
 async function handleSubmission(text) {
     try {
-        // 1. 先清除狀態
+        const difficulty = difficultySelect.value; // 獲取當前模式（簡單或挑戰）
+        
+        // 1. 清除狀態
         isWaitingForSubmission = false;
-        clearTranscriptionPreview();  // 清除預覽
+        clearTranscriptionPreview(); // 清除預覽
         
         // 2. 更新狀態顯示
         recordStatus.textContent = '正在等待 AI 回應...';
@@ -790,7 +806,7 @@ async function handleSubmission(text) {
             throw new Error('提交的文字內容為空');
         }
 
-        // 3. 先顯示老師的回應 - 這是關鍵步驟
+        // 3. 先顯示老師的回應
         updateDialogueDisplay("老師", text);
 
         // 4. 發送請求到後端
@@ -811,33 +827,81 @@ async function handleSubmission(text) {
         }
 
         const data = await response.json();
-        
-        // 5. 處理回應
-        if (data.completed && data.analysis) {
-            // 對話結束，顯示分析結果
-            analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-            disableUserInput();
-        } else if (data.response) {
-            // 顯示家長回應並檢查是否需要繼續對話
-            updateDialogueDisplay("家長", data.response);
-            dialogueCount >= 6 ? disableUserInput() : enableUserInput();
+
+        // 5. 根據模式處理回應
+        if (difficulty === '簡單') {
+            if (data.completed && data.analysis) {
+                // 簡單模式下對話結束，顯示分析結果
+                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+                disableUserInput();
+            } else if (data.response) {
+                // 簡單模式，檢查是否達到最大對話數
+                updateDialogueDisplay("家長", data.response);
+                if (dialogueCount >= 6) {
+                    disableUserInput();
+                    showEndDialogueMessage();
+                } else {
+                    enableUserInput();
+                }
+            }
+        } else if (difficulty === '挑戰') {
+            // 挑戰模式無對話次數限制
+            if (data.completed && data.analysis) {
+                // 如果挑戰模式自動完成（倒計時結束後），顯示分析結果
+                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+                disableUserInput();
+            } else if (data.response) {
+                // 挑戰模式，繼續顯示家長回應
+                updateDialogueDisplay("家長", data.response);
+                enableUserInput(); // 始終允許用戶繼續輸入
+            }
         }
 
         // 6. 清理狀態
         currentAccumulatedText = '';
         recordStatus.textContent = '';
-        
-        // 7. 如果對話結束，顯示結束訊息
-        if (dialogueCount >= 6) {
-            showEndDialogueMessage();
-        }
 
     } catch (error) {
         console.error('對話提交錯誤:', error);
         recordStatus.textContent = `錯誤：${error.message}`;
-        enableUserInput();  // 發生錯誤時允許重試
+        enableUserInput(); // 發生錯誤時允許重試
     }
 }
+
+
+function startCountdown() {
+    const countdownDisplay = document.getElementById('countdownDisplay'); // 假設有倒計時顯示的 DOM 元素
+
+    countdownDisplay.style.display = 'block';
+
+    challengeTimer = setInterval(() => {
+        countdownRemaining -= 1;
+
+        // 更新倒計時顯示
+        const minutes = Math.floor(countdownRemaining / 60);
+        const seconds = countdownRemaining % 60;
+        countdownDisplay.textContent = `倒計時: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // 倒計時結束
+        if (countdownRemaining <= 0) {
+            clearInterval(challengeTimer);
+            challengeTimer = null;
+
+            countdownDisplay.style.display = 'none';
+            handleChallengeEnd(); // 倒計時結束後處理挑戰結束邏輯
+        }
+    }, 1000);
+}
+
+
+function stopCountdown() {
+    if (challengeTimer) {
+        clearInterval(challengeTimer);
+        challengeTimer = null;
+    }
+    countdownRemaining = 180; // 重置倒計時
+}
+
   
 function showEndDialogueMessage() {
     const messageDiv = document.createElement('div');
@@ -848,4 +912,50 @@ function showEndDialogueMessage() {
     `;
     dialogueDisplay.appendChild(messageDiv);
     currentAccumulatedText = '';
+}
+// 新增挑戰模式結束邏輯函數
+async function handleChallengeEnd() {
+    try {
+        disableUserInput();
+        recordStatus.textContent = '挑戰模式已結束，正在分析對話...';
+
+        // 請求後端進行分析
+        const response = await fetch('/api/dialogue/continue-dialogue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                userResponse:"", 
+                practiceId: currentPracticeId,
+                challengeTimeOver: true
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.analysis) {
+            analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+        } else {
+            analysisContent.innerHTML = '<p>未獲得分析結果，請稍後再試。</p>';
+        }
+
+        showEndDialogueMessage(); // 顯示對話結束訊息
+    } catch (error) {
+        console.error('挑戰模式結束時發生錯誤:', error);
+        recordStatus.textContent = '分析失敗，請重試';
+    }
+}
+
+function resetCountdown() {
+    if (challengeTimer) {
+        clearInterval(challengeTimer);
+        challengeTimer = null;
+    }
+    countdownRemaining = 180; // 重置倒計時為初始值（3 分鐘）
+    const countdownDisplay = document.getElementById('countdownDisplay');
+    if (countdownDisplay) {
+        countdownDisplay.textContent = '倒計時: 3:00'; // 恢復倒計時初始狀態
+    }
 }
