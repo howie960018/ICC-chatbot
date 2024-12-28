@@ -185,10 +185,18 @@ button:disabled {
     color: #ffffff;
 }
 
+#practiceList {
+    margin: 0; /* 移除外邊距 */
+    padding: 0; /* 移除內邊距 */
+    list-style: none; /* 移除預設的列表符號 */
+    width: 100%; /* 確保寬度佔滿父容器 */
+}
+
+
 #practiceList li {
     margin: 10px 0; /* 上下間距 */
     padding: 5px; /* 內邊距 */
-    border-radius: 5px; /* 圓角 */
+    border-radius: 6px; /* 圓角 */
     list-style: none; /* 移除預設的列表樣式 */
 }
 
@@ -372,7 +380,7 @@ audio {
 #practiceSidebar {
     width: 20%; /* 調整寬度為 20% */
     max-width: 250px; /* 設定最大寬度 */
-    min-width: 150px; /* 設定最小寬度，避免過窄 */
+    min-width: 200px; /* 設定最小寬度，避免過窄 */
     overflow-y: auto; /* 如果內容超出高度，可以垂直滾動 */
     border-right: 1px solid #ddd; /* 增加分隔線讓版面更有結構 */
     padding: 10px; /* 增加內邊距讓內容更美觀 */
@@ -553,6 +561,42 @@ audio {
     font-style: italic;
 }
 
+.practice-item {
+    cursor: pointer; /* 鼠標顯示手指圖標 */
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.practice-item {
+    margin: 0; /* 移除外邊距 */
+    padding: 10px; /* 添加適當的內邊距 */
+    width: 100%; /* 讓每個項目寬度佔滿父容器 */
+    box-sizing: border-box; /* 確保內邊距不影響寬度計算 */
+    text-align: left; /* 確保文本靠左對齊 */
+}
+
+.practice-item:hover {
+    background-color: #45a049; /* 鼠標懸停時背景色變化 */
+    color: white;
+}
+
+.practice-item.selected {
+    background-color: #45a049; /* 點擊後選中的背景色 */
+    color: white;
+    font-weight: bold; /* 高亮選中項 */
+}
+
+.site-banner {
+    transition: transform 0.3s ease-in-out;
+    will-change: transform;
+}
+
+.login-image {
+    width: 250px; /* 設定圖片寬度 */
+    height: auto; /* 自動調整高度以保持比例 */
+    margin: 0 auto; /* 如果需要居中，添加這行 */
+    display: block; /* 保證圖片是塊級元素，配合 margin 居中 */
+}
 
 @keyframes spin {
     0% { transform: rotate(0deg); }

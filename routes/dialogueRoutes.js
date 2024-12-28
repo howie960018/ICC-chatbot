@@ -104,7 +104,7 @@ function createInitialMessage(scenario,parentPersonality) {
     1. 情境內容以及家長的第一句話
     2. 根據情境，提供一個建議的老師開場白，作為參考
 
-    請用繁體中文跟我進行角色模擬，我扮演導師，我們兩個模擬對話。 對話結束後，評估我有沒有正確使用到「我訊息」或「三明治溝通法」。你是家長，不需要使用我訊息或三明治溝通法；
+    請用繁體中文跟我進行角色模擬，我扮演導師，我們兩個模擬對話。 對話結束後，評估我有沒有正確使用到「我訊息」「三明治溝通法」或「綜合溝通技巧」。你是家長，不需要使用我訊息或三明治溝通法；
 
     情境內容：
     ${scenario}
@@ -191,7 +191,7 @@ function parseInitialResponse(response) {
         addToHistory({ role: "導師", content: userResponse });
         incrementCount();
 
-        if (!dialogueState.challengeMode && dialogueState.count >= 6) {
+        if (!dialogueState.challengeMode && dialogueState.count >= 12) {
             const analysis = await analyzeDialogue(practiceId);
   
             await updatePractice(practiceId, {
@@ -203,11 +203,11 @@ function parseInitialResponse(response) {
         }
 
         const systemMessage = `請用繁體中文根據老師上一句的回應回覆，你是一名${parentPersonality}的家長，
-        如果家長個性是"完全無法接受他人觀點或建議"的家長，無論老師的回應多麼得體，請表現出以下行為：
+        如果家長個性是"完全無法接受他人觀點或建議"的家長，請表現出以下行為：
         1. 強烈質疑老師的立場，認為老師無法理解你孩子的真正狀況。
-        2. 始終堅持自己孩子無錯，並試圖將問題歸因於外部原因（如其他孩子或老師的處理方式）。
-        3. 對老師的建議表現出冷漠甚至敵意，不願積極配合。
-        4. 語氣可以很粗暴，不合作甚至詆毀老師。
+        2. 始終堅持自己孩子無錯，試圖將問題歸因於外部原因（如其他孩子或老師的處理方式）。
+        3. 除非老師提出非常說服力的建議，否則不願積極配合。
+        4. 語氣可以很不友善。
         `;
 
         const messages = [

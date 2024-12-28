@@ -65,7 +65,7 @@ function generateIMessagePrompt(conversationHistory) {
     待改進 (60~69 分)：表現有不足，需加強多個溝通面向。
     不足 (60 分以下)：未能有效運用「我訊息」溝通法，溝通失敗或家長反感。
 
-    評量結果：
+    評分：
 
     整體回饋：
 
@@ -91,7 +91,7 @@ function generateSandwichPrompt(conversationHistory) {
     不足 (60 分以下)：未能有效運用三明治溝通法，溝通失敗。
 
    
-    評量結果：
+    評分：
 
     整體回饋：
 
@@ -117,7 +117,7 @@ function generateComprehensivePrompt(conversationHistory) {
     不足 (60 分以下)：未能有效運用積極傾聽、同理心、清晰表達、雙向溝通與解決問題導向溝通法，溝通失敗。
 
    
-    評量結果：
+    評分：
 
     整體回饋：
 

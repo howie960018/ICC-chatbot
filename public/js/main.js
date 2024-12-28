@@ -23,13 +23,20 @@ let isWaitingForSubmission = false;
 let submissionTimer = null;
 let currentDialogueRecordings = [];
 let isRecording = false;
-const maxDialogues = 6;
+const maxDialogues = 12;
 const MAX_RECORDING_TIME = 20 * 1000; // 最大錄音時間，這裡設定為 20 秒
 let currentAccumulatedText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
     const welcomeMessage = document.getElementById('welcomeMessage');
     const username = localStorage.getItem('username');
+
+    const startRecordBtn = document.getElementById('startRecordBtn');
+    const stopRecordBtn = document.getElementById('stopRecordBtn');
+
+        // 預設禁用錄音按鈕
+        startRecordBtn.disabled = true;
+        stopRecordBtn.disabled = true;
 
     if (username) {
         welcomeMessage.textContent = `歡迎, ${username}`;
@@ -41,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dialogueDisplay = document.getElementById('dialogueDisplay');
 
     scenarioDisplay.innerHTML = `
+    <img src="/jpg/55.png" alt="Login Page Image" class="login-image" />
         <p>使用教學：</p>
         <ul>
             <li><strong>Step 1:</strong> 選擇溝通技巧與模式：</li>
@@ -57,6 +65,22 @@ document.addEventListener('DOMContentLoaded', () => {
         <p>對話內容將顯示在這裡。開始練習後，家長的第一句話將出現在此。</p>
     `;
 
+    const banner = document.querySelector('.site-banner');
+    let lastScrollPosition = 0;
+
+    window.addEventListener('scroll', () => {
+        const currentScrollPosition = window.pageYOffset;
+
+        if (currentScrollPosition > lastScrollPosition) {
+            // 用户向下滚动，隐藏 banner
+            banner.style.transform = 'translateY(-100%)';
+        } else {
+            // 用户向上滚动，显示 banner
+            banner.style.transform = 'translateY(0)';
+        }
+
+        lastScrollPosition = currentScrollPosition;
+    });
 
 
 });
@@ -111,11 +135,10 @@ setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 
 // 在選擇練習時
 async function selectPractice(practiceId) {
-    currentPracticeId = practiceId;
-    localStorage.setItem('currentPracticeId', currentPracticeId);
-    
-    await loadPracticeDetails(practiceId);
-    await loadRecordingsHistory(practiceId);
+    currentPracticeId = practiceId; // 更新當前練習 ID
+    localStorage.setItem('currentPracticeId', practiceId); // 儲存到 LocalStorage
+    await loadPracticeDetails(practiceId); // 加載詳細內容
+    await loadRecordingsHistory(practiceId); // 加載錄音歷史
 }
 
 async function loadPracticeDetails(practiceId) {
@@ -165,33 +188,33 @@ function displayPracticeDetails(practice) {
     
             const paragraphElement = document.createElement('p');
     
+            // 特殊處理「整體回饋：」和「具體描述對方行為：」加粗
+            let content = cleanedParagraph
+                .replace(/整體回饋：/g, '<strong>整體回饋：</strong>')
+                .replace(/具體描述對方行為：/g, '<strong>具體描述對方行為：</strong>');
+    
+            // 在數字前換行
+            content = content.replace(/(\d+)/g, '<br>$1');
+    
             // 處理子標題並換行
-            const subtitleMatch = cleanedParagraph.match(/^(.*?：)/); // 匹配「子標題：」格式
+            const subtitleMatch = content.match(/^(.*?：)/); // 匹配「子標題：」格式
             if (subtitleMatch) {
                 const subtitle = subtitleMatch[1];
-                let content = cleanedParagraph.replace(subtitle, '').trim();
+                content = content.replace(subtitle, '').trim();
     
                 // 在 `)` 後換行並加粗
                 content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
     
                 // 處理數字和冒號之間的文字加粗
                 content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
-    
-                // 處理以 "1." 開頭的部分換行
-                content = content.replace(/(1\..*?)(?=\s|$)/g, '<br>$1');
     
                 paragraphElement.innerHTML = `<strong>${subtitle}</strong>${content}`;
             } else {
-                let content = cleanedParagraph;
-    
                 // 在 `)` 後換行並加粗
                 content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
     
                 // 處理數字和冒號之間的文字加粗
                 content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
-    
-                // 處理以 "1." 開頭的部分換行
-                content = content.replace(/(1\..*?)(?=\s|$)/g, '<br>$1');
     
                 paragraphElement.innerHTML = content;
             }
@@ -202,10 +225,6 @@ function displayPracticeDetails(practice) {
         analysisContent.textContent = '尚無分析結果';
     }
     
-    
-
-
-
     const dialogueDisplay = document.getElementById('dialogueDisplay');
 
     
@@ -240,62 +259,74 @@ function displayPracticeDetails(practice) {
 }
 
 
-  
 async function loadPractices() {
-    const token = localStorage.getItem('token'); // 從 LocalStorage 中獲取用戶的授權 Token
+    const token = localStorage.getItem('token'); // 從 LocalStorage 獲取 Token
 
     try {
-        // 向後端請求練習數據
         const response = await fetch('/api/practice/practices', {
-            headers: { Authorization: `Bearer ${token}` } // 添加授權標頭
+            headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await response.json(); // 解析返回的 JSON 資料
+        const data = await response.json();
 
-        const practiceList = document.getElementById('practiceList'); // 獲取練習列表的 DOM 元素
-        practiceList.innerHTML = ''; // 清空列表，準備重新加載
+        const practiceList = document.getElementById('practiceList'); // 獲取練習列表 DOM
+        practiceList.innerHTML = ''; // 清空列表
 
         if (data.success && Array.isArray(data.practices) && data.practices.length > 0) {
             data.practices.forEach(practice => {
                 // 創建列表項目
                 const listItem = document.createElement('li');
+                listItem.classList.add('practice-item');
+                listItem.setAttribute('data-practice-id', practice._id);
                 listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleDateString('zh-TW')}`;
 
-                // 添加選取按鈕
-                const selectButton = document.createElement('button');
-                selectButton.textContent = '選取';
-                selectButton.classList.add('select-btn'); // 添加自定義類
-                selectButton.addEventListener('click', async () => {
-                    await selectPractice(practice._id); // 儲存並加載當前練習
+                // 綁定點擊事件到列表項目
+                listItem.addEventListener('click', async () => {
+                    // 取消其他項目選中樣式
+                    document.querySelectorAll('.practice-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+
+                    // 標記當前項目為選中
+                    listItem.classList.add('selected');
+
+                    // 呼叫選取練習的邏輯
+                    await selectPractice(practice._id);
                 });
 
                 // 添加刪除按鈕
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = '刪除';
-                deleteButton.classList.add('small-btn'); // 添加自定義類
+                deleteButton.classList.add('small-btn');
                 deleteButton.addEventListener('click', async (e) => {
                     e.stopPropagation(); // 防止點擊刪除按鈕時觸發列表項點擊事件
                     if (confirm('確認刪除此練習紀錄？')) {
-                        await deletePractice(practice._id); // 刪除該練習
-                        await loadPractices(); // 重新加載練習列表
+                        await deletePractice(practice._id);
+                        await loadPractices(); // 重新加載列表
                     }
                 });
 
-                // 將按鈕添加到列表項目
-                listItem.appendChild(selectButton);
-                listItem.appendChild(deleteButton);
-
-                // 將列表項目添加到練習列表
-                practiceList.appendChild(listItem);
+                //listItem.appendChild(deleteButton); // 添加刪除按鈕到項目
+                practiceList.appendChild(listItem); // 將項目加入列表
             });
         } else {
-            practiceList.innerHTML = '<li>目前無練習記錄</li>'; // 無練習時的提示
+            practiceList.innerHTML = '<li>目前無練習記錄</li>';
         }
     } catch (error) {
         console.error('載入練習失敗:', error);
-        const practiceList = document.getElementById('practiceList');
         practiceList.innerHTML = '<li class="error-message">載入練習時發生錯誤</li>';
     }
 }
+
+
+document.getElementById('practiceList').addEventListener('click', async (event) => {
+    const target = event.target;
+    if (target.classList.contains('practice-item')) {
+        const practiceId = target.getAttribute('data-practice-id');
+        if (practiceId) {
+            await selectPractice(practiceId); // 執行選取邏輯
+        }
+    }
+});
 
 
 
@@ -363,7 +394,7 @@ async function deletePractice(practiceId) {
         const data = await response.json();
 
         if (data.success) {
-            alert('練習紀錄已刪除');
+            
             if (currentPracticeId === practiceId) {
                 localStorage.removeItem('currentPracticeId'); // 如果刪除的是當前練習，清空選擇
                 currentPracticeId = null;
@@ -443,29 +474,39 @@ startRecordBtn.addEventListener('click', async () => {
                     clearTimeout(submissionTimer);
                 }
 
-        // 設定新的計時器
-        recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
-        isWaitingForSubmission = true;
-        
-        submissionTimer = setTimeout(async () => {
-            try {
-                if (currentAccumulatedText.trim().length > 0) {
-                    await handleSubmission(currentAccumulatedText);
-                }
-            } catch (error) {
-                console.error('提交處理錯誤:', error);
-                recordStatus.textContent = '處理錯誤，請重試';
-            } finally {
-                currentAccumulatedText = '';
-                isWaitingForSubmission = false;
-            }
-        }, 5000);
+                // 設定倒計時提示
+                let countdown = 5; // 倒計時秒數
+                isWaitingForSubmission = true;
 
-                
+                recordStatus.textContent = `已轉錄！若需補充請繼續按下"開始錄音"，AI將再 ${countdown} 秒後回應`;
+
+                submissionTimer = setInterval(async () => {
+                    countdown--;
+                    recordStatus.textContent = `已轉錄！若需補充請繼續按下"開始錄音"，AI將再 ${countdown} 秒後回應`;
+
+                    if (countdown <= 0) {
+                        clearInterval(submissionTimer); // 停止倒計時
+                        submissionTimer = null;
+
+                        try {
+                            if (currentAccumulatedText.trim().length > 0) {
+                                await handleSubmission(currentAccumulatedText);
+                            }
+                        } catch (error) {
+                            console.error('提交處理錯誤:', error);
+                            recordStatus.textContent = '處理錯誤，請重試';
+                        } finally {
+                            currentAccumulatedText = '';
+                            isWaitingForSubmission = false;
+                        }
+                    }
+                }, 1000); // 每秒更新倒計時提示
+
             } catch (error) {
                 console.error('轉錄錯誤：', error);
                 recordStatus.textContent = '發生錯誤：' + error.message;
             }
+
         };
 
         mediaRecorder.start();
@@ -824,8 +865,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadRecordingsHistory(currentPracticeId);
     }
 
-    
-    alert('請先選擇溝通技巧，再新增練習');
+   
     
 });
 
@@ -905,10 +945,11 @@ async function handleSubmission(text) {
             } else if (data.response) {
                 // 簡單模式，檢查是否達到最大對話數
                 updateDialogueDisplay("家長", data.response);
-                if (dialogueCount >= 6) {
+                if (dialogueCount >= maxDialogues) {
                     disableUserInput();
                     showEndDialogueMessage();
                 } else {
+                    recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。'; // 顯示提示
                     enableUserInput();
                 }
             }
@@ -921,13 +962,16 @@ async function handleSubmission(text) {
             } else if (data.response) {
                 // 挑戰模式，繼續顯示家長回應
                 updateDialogueDisplay("家長", data.response);
+                recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。'; // 顯示提示
                 enableUserInput(); // 始終允許用戶繼續輸入
             }
         }
 
         // 6. 清理狀態
         currentAccumulatedText = '';
-        recordStatus.textContent = '';
+        if (!recordStatus.textContent) {
+            recordStatus.textContent = ''; // 如果未設置提示，清除狀態顯示
+        }
 
     } catch (error) {
         console.error('對話提交錯誤:', error);
@@ -1056,7 +1100,7 @@ document.getElementById('submitFeedbackBtn').addEventListener('click', async () 
       const data = await response.json();
       if (data.success) {
         feedbackInput.value = ''; // 清空輸入框
-        alert('心得提交成功！');
+        
         loadFeedbackList(practiceId); // 重新載入心得列表
       } else {
         throw new Error(data.message || '提交心得失敗');

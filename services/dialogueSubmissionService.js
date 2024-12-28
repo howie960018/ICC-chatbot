@@ -30,7 +30,7 @@ async function handleDialogueSubmission(transcription, practiceId) {
     incrementCount();
 
     // 如果對話達到結束條件，執行分析
-    if (dialogueState.count >= 6) {
+    if (dialogueState.count >= 12) {
       console.log('Dialogue complete, performing analysis'); // 調試用
       const analysis = await analyzeDialogue();
 

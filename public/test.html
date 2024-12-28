@@ -55,7 +55,7 @@
     <div class="site-banner">
         
         <span class="welcome" id="welcomeMessage">歡迎!</span>
-        ICC師生溝通建置系統
+        ICC 親師溝通建置系統
         <button id="logoutButton" class="logout-btn">登出</button>
     </div>
 
@@ -66,6 +66,7 @@
             </div>
 
             <div id="practiceSidebar" class="recordings-sidebar">
+                <div class="recordings-title">溝通技巧介紹</div>
                 <!-- 新增顯示區域 -->
                 <div class="technique-options">
                     <button onclick="selectPracticeByTechnique('我訊息')">我訊息</button>
@@ -78,6 +79,7 @@
             </div>
 
             <div class="main-section">
+                
                 <div id="techniqueIntro" class="panel" style="display: none;"></div>
                 <div class="panel">
                     <select id="techniqueSelect">
@@ -114,7 +116,7 @@
                     <div id="feedbackList" class="feedback-list">
                         <p class="no-feedback">目前尚無心得紀錄。</p>
                     </div>
-                    <textarea id="feedbackInput" class="feedback-input" placeholder="在此輸入您的心得..."></textarea>
+                    <textarea id="feedbackInput" class="feedback-input" placeholder="本次練習做得好的地方、可以改進的地方或其他..."></textarea>
                     <button id="submitFeedbackBtn" class="feedback-btn">提交心得</button>
                 </div>
             </div>
