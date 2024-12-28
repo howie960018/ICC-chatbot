@@ -10,6 +10,8 @@ const analysisContent = document.getElementById('analysisContent');
 const practiceSelect = document.getElementById('select-btn');
 const difficultySelect = document.getElementById('difficultySelect'); 
 
+
+
 // 全局變數
 let countdownTimer = null; 
 let challengeTimer = null; // 挑戰倒計時計時器
@@ -41,6 +43,9 @@ document.getElementById('logoutButton').addEventListener('click', () => {
     // 清除 localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+
+
+    
 
     // 跳轉回登入頁面
     window.location.href = '/login';
