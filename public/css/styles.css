@@ -485,7 +485,7 @@ audio {
 }
 
 .feedback-section {
-    background-color: #fff3e0;
+    background-color: #ffffff;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -493,7 +493,7 @@ audio {
 }
 
 .feedback-section h3 {
-    color: #ff9800;
+    color: #01934c;
     margin-bottom: 15px;
     font-size: 1.5em;
     text-align: center;
@@ -535,7 +535,7 @@ audio {
 .feedback-btn {
     width: 100%;
     padding: 10px;
-    background-color: #ff9800;
+    background-color: #008136;
     color: white;
     border: none;
     border-radius: 5px;
@@ -544,7 +544,7 @@ audio {
 }
 
 .feedback-btn:hover {
-    background-color: #fb8c00;
+    background-color: #009e3d;
 }
 
 .no-feedback {

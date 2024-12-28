@@ -119,8 +119,7 @@ function createInitialMessage(scenario,parentPersonality) {
     情境內容：
     [描述情境]
 
-    (換行)家長個性: 
-    ${parentPersonality} (粗體表示)
+
     
 
     根據情境，老師對家長說的第一句話：
@@ -208,7 +207,7 @@ function parseInitialResponse(response) {
         1. 強烈質疑老師的立場，認為老師無法理解你孩子的真正狀況。
         2. 始終堅持自己孩子無錯，並試圖將問題歸因於外部原因（如其他孩子或老師的處理方式）。
         3. 對老師的建議表現出冷漠甚至敵意，不願積極配合。
-        4. 語氣不必粗暴，但需保持疏離、不合作或消極抵抗。
+        4. 語氣可以很粗暴，不合作甚至詆毀老師。
         `;
 
         const messages = [

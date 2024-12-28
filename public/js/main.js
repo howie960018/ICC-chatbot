@@ -37,12 +37,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // 如果未登入，跳轉回登入頁面
         window.location.href = '/login';
     }
+    const scenarioDisplay = document.getElementById('scenarioDisplay');
+    const dialogueDisplay = document.getElementById('dialogueDisplay');
+
+    scenarioDisplay.innerHTML = `
+        <p>使用教學：</p>
+        <ul>
+            <li><strong>Step 1:</strong> 選擇溝通技巧與模式：</li>
+            <ul>
+                <li><strong>基礎模式：</strong>最多回應 6 句。</li>
+                <li><strong>挑戰模式：</strong>限時 3 分鐘回應。</li>
+            </ul>
+            <li><strong>Step 2:</strong> 按下「開始練習」按鈕後，練習將開始。</li>
+            <li><strong>Step 3:</strong> 根據家長的回應，按下「開始錄音」進行回應，完成後按「停止錄音」。系統將轉錄並分析您的回應。</li>
+        </ul>
+    `;
+
+    dialogueDisplay.innerHTML = `
+        <p>對話內容將顯示在這裡。開始練習後，家長的第一句話將出現在此。</p>
+    `;
+
+
+
 });
 
 document.getElementById('logoutButton').addEventListener('click', () => {
     // 清除 localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('currentPracticeId'); // 清理練習 ID
 
 
     
@@ -132,21 +155,56 @@ function displayPracticeDetails(practice) {
 
 
     analysisContent.innerHTML = '';
-
     if (practice.analysis) {
         // 將分析內容按段落分割
         const paragraphs = practice.analysis.split(/(?<=。)\s/); // 按句號+空格切分段落
-
+    
         paragraphs.forEach(paragraph => {
-
-            const cleanedParagraph = paragraph.replace(/[#*]/g, '').trim();
+            // 去掉 `-` 符號
+            const cleanedParagraph = paragraph.replace(/[#*]/g, '').replace(/-/g, '').trim();
+    
             const paragraphElement = document.createElement('p');
-            paragraphElement.textContent = cleanedParagraph;
+    
+            // 處理子標題並換行
+            const subtitleMatch = cleanedParagraph.match(/^(.*?：)/); // 匹配「子標題：」格式
+            if (subtitleMatch) {
+                const subtitle = subtitleMatch[1];
+                let content = cleanedParagraph.replace(subtitle, '').trim();
+    
+                // 在 `)` 後換行並加粗
+                content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
+    
+                // 處理數字和冒號之間的文字加粗
+                content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
+    
+                // 處理以 "1." 開頭的部分換行
+                content = content.replace(/(1\..*?)(?=\s|$)/g, '<br>$1');
+    
+                paragraphElement.innerHTML = `<strong>${subtitle}</strong>${content}`;
+            } else {
+                let content = cleanedParagraph;
+    
+                // 在 `)` 後換行並加粗
+                content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
+    
+                // 處理數字和冒號之間的文字加粗
+                content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
+    
+                // 處理以 "1." 開頭的部分換行
+                content = content.replace(/(1\..*?)(?=\s|$)/g, '<br>$1');
+    
+                paragraphElement.innerHTML = content;
+            }
+    
             analysisContent.appendChild(paragraphElement);
         });
     } else {
         analysisContent.textContent = '尚無分析結果';
     }
+    
+    
+
+
 
     const dialogueDisplay = document.getElementById('dialogueDisplay');
 
@@ -377,10 +435,13 @@ startRecordBtn.addEventListener('click', async () => {
 
                 currentAccumulatedText = `${currentAccumulatedText.trim()} ${transcribedText}`.trim();
                 updateTranscriptionPreview(currentAccumulatedText);
-                        // 清除之前的計時器
-        if (submissionTimer) {
-            clearTimeout(submissionTimer);
-        }
+
+                await loadRecordingsHistory(currentPracticeId);
+
+                // 清除之前的計時器
+                if (submissionTimer) {
+                    clearTimeout(submissionTimer);
+                }
 
         // 設定新的計時器
         recordStatus.textContent = '轉錄完成！如需補充請繼續錄音，5秒後AI將回應';
@@ -660,6 +721,12 @@ async function startDialogue(practiceId) {
         return;
     }
 
+    const scenarioDisplay = document.getElementById('scenarioDisplay');
+    const dialogueDisplay = document.getElementById('dialogueDisplay');
+
+    scenarioDisplay.innerHTML = '';
+    dialogueDisplay.innerHTML = '';
+
     enableUserInput();
 
     const spinner = document.getElementById('loadingSpinner');
@@ -769,18 +836,8 @@ function clearAnalysis() {
 
 async function loadRecordingsHistory(practiceId) {
     try {
-        // 使用傳入的 practiceId，如果沒有就使用當前的
-        const targetPracticeId = practiceId || currentPracticeId;
-
-        if (!targetPracticeId) {
-            console.warn('無法載入錄音歷史：未指定練習 ID');
-            return;
-        }
-
-        const response = await fetch(`/api/audio/recordings?practiceId=${targetPracticeId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
+        const response = await fetch(`/api/audio/recordings?practiceId=${practiceId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
 
         const data = await response.json();
@@ -791,29 +848,17 @@ async function loadRecordingsHistory(practiceId) {
             return;
         }
 
-        const sortedRecordings = data.recordings.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-        recordingsList.innerHTML = sortedRecordings.map(recording => `
+        recordingsList.innerHTML = data.recordings.map(recording => `
             <li class="recording-item">
-                <div class="recording-time">
-                    ${new Date(recording.timestamp).toLocaleString('zh-TW')}
-                </div>
-                <div class="recording-audio">
-                    <audio controls src="${recording.path}"></audio>
-                </div>
-                <div class="recording-text">
-                    <p>${recording.transcription || '無轉錄文字'}</p>
-                </div>
+                <div class="recording-time">${new Date(recording.timestamp).toLocaleString('zh-TW')}</div>
+                <audio controls src="${recording.path}"></audio>
+                <div class="recording-text">${recording.transcription || '無轉錄文字'}</div>
             </li>
         `).join('');
-
     } catch (error) {
         console.error('載入錄音歷史失敗:', error);
-        const recordingsList = document.getElementById('recordingsList');
-        recordingsList.innerHTML = '<li class="error-message">載入錄音歷史時發生錯誤</li>';
     }
 }
-
 async function handleSubmission(text) {
     try {
         const difficulty = difficultySelect.value; // 獲取當前模式（簡單或挑戰）

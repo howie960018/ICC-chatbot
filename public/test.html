@@ -1,87 +1,130 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>溝通技巧訓練系統</title>
+    <title>ICC溝通技巧訓練系統</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        /* Banner 的樣式 */
+        .site-banner {
+            background-color: #4CAF50; /* 綠色背景 */
+            color: white; /* 文字白色 */
+            text-align: center; /* 文字置中 */
+            padding: 15px 20px; /* 上下內邊距 */
+            font-size: 32px; /* 字體大小 */
+            font-weight: bold; /* 粗體 */
+            position: fixed; /* 固定在頁面頂部 */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000; /* 保證在其他元素之上 */
+            display: flex;
+            justify-content: space-between; /* 左右佈局 */
+            align-items: center; /* 垂直置中 */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* 添加陰影效果 */
+        }
+
+        .site-banner .welcome {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .site-banner .logout-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .site-banner .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        .content-container {
+            margin-top: 80px; /* 預留空間避免被 banner 遮擋 */
+        }
+    </style>
 </head>
 <body>
-    <div id="header" class="header">
-        <h2 id="welcomeMessage">歡迎!</h2>
-        <button id="logoutButton">登出</button>
+    <!-- 新增的 Banner -->
+    <div class="site-banner">
+        
+        <span class="welcome" id="welcomeMessage">歡迎!</span>
+        ICC師生溝通建置系統
+        <button id="logoutButton" class="logout-btn">登出</button>
     </div>
-    
-    <div class="container">
 
-        <div id="loadingSpinner" class="spinner-overlay">
-            <div class="spinner"></div>
-        </div>
-
-        <div id="practiceSidebar" class="recordings-sidebar">
-            <!-- 新增顯示區域 -->
-            <div class="technique-options">
-                <button onclick="selectPracticeByTechnique('我訊息')">我訊息</button>
-                <button onclick="selectPracticeByTechnique('三明治溝通法')">三明治溝通法</button>
-                <button onclick="selectPracticeByTechnique('綜合溝通技巧')">綜合溝通技巧</button>
+    <div class="content-container">
+        <div class="container">
+            <div id="loadingSpinner" class="spinner-overlay">
+                <div class="spinner"></div>
             </div>
 
-
-            <div class="recordings-title">練習紀錄</div>
-            <ul id="practiceList"></ul>
-        
-        </div>
-        
-          
-        <div class="main-section">
-
-            <div id="techniqueIntro" class="panel" style="display: none;"></div>
-            <div class="panel">
-                <select id="techniqueSelect">
-                    <option value="我訊息">我訊息</option>
-                    <option value="三明治溝通法">三明治溝通法</option>
-                    <option value="綜合溝通技巧">綜合溝通技巧</option>
-                </select>
-                <select id="difficultySelect">
-                    <option value="簡單">基礎模式</option>
-                    <option value="挑戰">挑戰模式</option>
-                </select>
-                <button id="startPracticeBtn">開始練習</button>
-            </div>
-    
-            <div id="scenarioDisplay" class="panel"></div>
-            <div id="dialogueDisplay" class="panel"></div>
-    
-            <div class="record-controls panel">
-                <button id="startRecordBtn">開始錄音</button>
-                <button id="stopRecordBtn" disabled>停止錄音</button>
-                <div id="countdownDisplay" style="font-size: 1.2em; font-weight: bold; color: red; margin-top: 10px;"></div>
-            </div>
-    
-            <div id="recordStatus" class="status"></div>
-            <div id="audioPlayback" class="audio-playback" style="display: none;"></div>
-            
-            <div id="analysisDisplay" class="panel">
-                <h3>分析結果</h3>
-                <div id="analysisContent"></div>
-            </div>
-
-            <div class="feedback-section panel">
-                <h3>📝 心得紀錄</h3>
-                <div id="feedbackList" class="feedback-list">
-                    <p class="no-feedback">目前尚無心得紀錄。</p>
+            <div id="practiceSidebar" class="recordings-sidebar">
+                <!-- 新增顯示區域 -->
+                <div class="technique-options">
+                    <button onclick="selectPracticeByTechnique('我訊息')">我訊息</button>
+                    <button onclick="selectPracticeByTechnique('三明治溝通法')">三明治溝通法</button>
+                    <button onclick="selectPracticeByTechnique('綜合溝通技巧')">綜合溝通技巧</button>
                 </div>
-                <textarea id="feedbackInput" class="feedback-input" placeholder="在此輸入您的心得..."></textarea>
-                <button id="submitFeedbackBtn" class="feedback-btn">提交心得</button>
-            </div>
-            
-        </div>
-    
-        <div class="recordings-sidebar">
-            <div class="recordings-title">錄音歷史</div>
-            <div id="recordingsList"></div>
-        </div>
 
+                <div class="recordings-title">練習紀錄</div>
+                <ul id="practiceList"></ul>
+            </div>
+
+            <div class="main-section">
+                <div id="techniqueIntro" class="panel" style="display: none;"></div>
+                <div class="panel">
+                    <select id="techniqueSelect">
+                        <option value="我訊息">我訊息</option>
+                        <option value="三明治溝通法">三明治溝通法</option>
+                        <option value="綜合溝通技巧">綜合溝通技巧</option>
+                    </select>
+                    <select id="difficultySelect">
+                        <option value="簡單">基礎模式</option>
+                        <option value="挑戰">挑戰模式</option>
+                    </select>
+                    <button id="startPracticeBtn">開始練習</button>
+                </div>
+
+                <div id="scenarioDisplay" class="panel"></div>
+                <div id="dialogueDisplay" class="panel"></div>
+
+                <div class="record-controls panel">
+                    <button id="startRecordBtn">開始錄音</button>
+                    <button id="stopRecordBtn" disabled>停止錄音</button>
+                    <div id="countdownDisplay" style="font-size: 1.2em; font-weight: bold; color: red; margin-top: 10px;"></div>
+                </div>
+
+                <div id="recordStatus" class="status"></div>
+                <div id="audioPlayback" class="audio-playback" style="display: none;"></div>
+
+                <div id="analysisDisplay" class="panel">
+                    <h3>分析結果</h3>
+                    <div id="analysisContent"></div>
+                </div>
+
+                <div class="feedback-section panel">
+                    <h3>📝 心得紀錄</h3>
+                    <div id="feedbackList" class="feedback-list">
+                        <p class="no-feedback">目前尚無心得紀錄。</p>
+                    </div>
+                    <textarea id="feedbackInput" class="feedback-input" placeholder="在此輸入您的心得..."></textarea>
+                    <button id="submitFeedbackBtn" class="feedback-btn">提交心得</button>
+                </div>
+            </div>
+
+            <div class="recordings-sidebar">
+                <div class="recordings-title">錄音歷史</div>
+                <div id="recordingsList"></div>
+            </div>
+        </div>
+    </div>
 
     <script src="/js/main.js"></script>
 </body>
