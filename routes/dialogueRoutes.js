@@ -30,7 +30,7 @@ router.post('/start-dialogue', async (req, res) => {
         resetDialogueState(technique);
   
         const parentPersonalities = difficulty === '挑戰' 
-            ? ['相信孩子，較自我中心', '完全無法接受他人觀點或建議']
+            ? ['相信孩子，較自我中心']
             : ['有點情緒但算明理'];
   
         // 隨機選擇家長個性
@@ -203,11 +203,7 @@ function parseInitialResponse(response) {
         }
 
         const systemMessage = `請用繁體中文根據老師上一句的回應回覆，你是一名${parentPersonality}的家長，
-        如果家長個性是"完全無法接受他人觀點或建議"的家長，請表現出以下行為：
-        1. 強烈質疑老師的立場，認為老師無法理解你孩子的真正狀況。
-        2. 始終堅持自己孩子無錯，試圖將問題歸因於外部原因（如其他孩子或老師的處理方式）。
-        3. 除非老師提出非常說服力的建議，否則不願積極配合。
-        4. 語氣可以很不友善。
+        如果您對老師回復不滿意，可以更生氣 或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。
         `;
 
         const messages = [
