@@ -112,36 +112,22 @@ router.post('/login', async (req, res) => {
 // 檢查 token
 router.get('/verify', async (req, res) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: '未提供 token'
-    });
+    return res.status(401).json({ success: false, message: '未提供 token' });
   }
-
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
     const user = await User.findById(decoded.id).select('-password');
-    
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: '使用者不存在'
-      });
+      return res.status(404).json({ success: false, message: '使用者不存在' });
     }
-
-    res.json({
-      success: true,
-      user
-    });
+    res.json({ success: true, user });
   } catch (error) {
-    res.status(401).json({
-      success: false,
-      message: '無效的 token'
-    });
+    console.error('無效的 token:', error.message); // 添加詳細日誌
+    res.status(401).json({ success: false, message: '無效的 token，請重新登入' });
   }
 });
+
 
 // 忘記密碼路由
 router.post('/forgot-password', async (req, res) => {

@@ -30,6 +30,14 @@ let currentAccumulatedText = '';
 document.addEventListener('DOMContentLoaded', () => {
     const welcomeMessage = document.getElementById('welcomeMessage');
     const username = localStorage.getItem('username');
+    const token = localStorage.getItem('token');
+
+
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
 
     const startRecordBtn = document.getElementById('startRecordBtn');
     const stopRecordBtn = document.getElementById('stopRecordBtn');
@@ -40,10 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (username) {
         welcomeMessage.textContent = `歡迎, ${username}`;
-    } else {
-        // 如果未登入，跳轉回登入頁面
-        window.location.href = '/login';
     }
+     
     const scenarioDisplay = document.getElementById('scenarioDisplay');
     const dialogueDisplay = document.getElementById('dialogueDisplay');
 
@@ -90,10 +96,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('currentPracticeId'); // 清理練習 ID
-
-
-    
-
+    localStorage.clear();
     // 跳轉回登入頁面
     window.location.href = '/login';
 });
@@ -110,26 +113,24 @@ function checkAuth() {
 
 async function refreshAuthToken() {
     try {
-        const response = await fetch('/api/auth/verify', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Token 驗證失敗');
+      const response = await fetch('/api/auth/verify', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-        
-        // Token 仍然有效，不需要更新
-        return true;
+      });
+      if (!response.ok) {
+        throw new Error('Token 驗證失敗');
+      }
+      return true;
     } catch (error) {
-        console.error('Token 驗證失敗:', error);
-        // Token 無效，重導向到登入頁面
-        window.location.href = '/login';
-        return false;
+      console.error('Token 驗證失敗:', error.message);
+      localStorage.clear(); // 清理所有 LocalStorage 資料
+      window.location.href = '/login';
+      return false;
     }
-}
-
+  }
+  
+  
 // 定期檢查 token
 setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 
@@ -560,13 +561,15 @@ function handleApiError(error, defaultMessage = '發生錯誤') {
 }
 
 // 檢查認證狀態的函數
-function checkAuthStatus() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login';
-        return false;
-    }
-    return true;
+let isRedirecting = false; // 防止多次跳轉
+
+function checkAuth() {
+  if (isRedirecting) return;
+  const token = localStorage.getItem('token');
+  if (!token) {
+    isRedirecting = true;
+    window.location.href = '/login';
+  }
 }
 
 stopRecordBtn.addEventListener('click', () => {
