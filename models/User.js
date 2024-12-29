@@ -94,7 +94,9 @@ const UserSchema = new mongoose.Schema({
         }
       ]
     }
-  ]
+  ],
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 });
 
 // 密碼雜湊中間件

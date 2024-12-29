@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
+
 
 // 註冊
 router.post('/register', async (req, res) => {
@@ -137,6 +140,75 @@ router.get('/verify', async (req, res) => {
       success: false,
       message: '無效的 token'
     });
+  }
+});
+
+// 忘記密碼路由
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  try {
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(404).json({ message: '該電子郵件未註冊' });
+      }
+
+      // 生成重設密碼 token
+      const token = crypto.randomBytes(20).toString('hex');
+      user.resetPasswordToken = token;
+      user.resetPasswordExpires = Date.now() + 3600000; // 1小時有效
+      await user.save();
+
+      // 發送電子郵件
+      const transporter = nodemailer.createTransport({
+          service: 'Gmail',
+          auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS
+          }
+      });
+
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${token}`;
+      const mailOptions = {
+          to: user.email,
+          from: 'noreply@yourdomain.com',
+          subject: '密碼重設請求',
+          text: `點擊以下連結重設密碼：\n\n${resetUrl}\n\n如果你未請求此操作，請忽略此郵件。`
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      res.json({ message: '重設密碼的連結已發送至您的電子郵件' });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: '發送電子郵件失敗，請稍後再試。' });
+  }
+});
+
+
+// 重設密碼路由
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+  try {
+      const user = await User.findOne({
+          resetPasswordToken: token,
+          resetPasswordExpires: { $gt: Date.now() }
+      });
+
+      if (!user) {
+          return res.status(400).json({ message: '無效或已過期的重設密碼 token' });
+      }
+
+      // 直接設置新密碼，讓 mongoose 中間件處理加密
+      user.password = newPassword;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      
+      await user.save(); // 這會觸發 pre('save') 中間件
+
+      res.json({ message: '密碼已成功重設，請重新登入' });
+  } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: '密碼重設失敗，請稍後再試。' });
   }
 });
 
