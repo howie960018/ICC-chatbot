@@ -102,14 +102,7 @@ document.getElementById('logoutButton').addEventListener('click', () => {
 });
 
 
-// 在檔案開頭添加
-function checkAuth() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login';
-        return;
-    }
-}
+
 
 async function refreshAuthToken() {
     try {
@@ -563,7 +556,7 @@ function handleApiError(error, defaultMessage = '發生錯誤') {
 // 檢查認證狀態的函數
 let isRedirecting = false; // 防止多次跳轉
 
-function checkAuth() {
+function checkAuthStatus() {
   if (isRedirecting) return;
   const token = localStorage.getItem('token');
   if (!token) {
