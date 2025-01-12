@@ -1,85 +1,156 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const { upload } = require('../config/multerConfig'); // 匯入上傳設定
-const { transcribeAudio } = require('../services/openaiService'); // 匯入 OpenAI API 服務
-const { addRecording, getDialogueState } = require('../services/dialogueService'); // 匯入對話狀態管理
-const { updatePractice } = require('../services/practiceService'); // 匯入練習服務
-const User = require('../models/User'); 
+const multer = require('multer');
+const AWS = require('aws-sdk');
+const User = require('../models/User');
+const { transcribeAudio } = require('../services/openaiService');
 
-/**
- * POST /transcribe
- * 上傳音頻並進行轉錄，同步保存到練習紀錄。
- */
-router.post('/transcribe', upload.single('audio'), async (req, res) => {
+// AWS S3 配置
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
+
+// Multer 配置
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 限制 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'audio/wav' || file.mimetype === 'audio/x-wav') {
+      cb(null, true);
+    } else {
+      cb(new Error('只接受 WAV 格式的音頻文件'));
+    }
+  }
+});
+
+// 輔助函數：檢查請求參數
+const validateRequest = (req) => {
+  const errors = [];
+  if (!req.file) errors.push('未接收到音頻文件');
+  if (!req.body.practiceId) errors.push('練習 ID 缺失');
   
+  return errors;
+};
+
+// 輔助函數：上傳檔案到 S3
+const uploadToS3 = async (file, fileName) => {
+  const uploadParams = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: fileName,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  };
+
+  return await s3.upload(uploadParams).promise();
+};
+
+// 上傳與轉錄音頻
+router.post('/transcribe', upload.single('audio'), async (req, res) => {
   try {
-    if (!req.file || !req.body.practiceId) {
-      throw new Error('Audio file or practiceId missing');
+    console.log('收到音頻上傳請求:', {
+      headers: req.headers,
+      body: req.body,
+      file: req.file ? '存在' : '不存在'
+    });
+
+    // 驗證請求
+    const validationErrors = validateRequest(req);
+    if (validationErrors.length > 0) {
+      throw new Error(validationErrors.join(', '));
     }
 
-    console.log('收到音頻文件:', req.file);
-    console.log('練習 ID:', req.body.practiceId);
+    // 生成檔案名稱
+    const fileName = `recording-${Date.now()}.wav`;
 
-    const transcription = await transcribeAudio(fs.createReadStream(req.file.path));
-    console.log('轉錄結果:', transcription);
+    // 上傳到 S3，正確傳入參數
+    const s3Result = await uploadToS3(req.file, fileName);
+    console.log('S3 上傳成功:', s3Result.Location);
 
+    // 轉錄音頻
+    const transcription = await transcribeAudio(s3Result.Location);
+    console.log('轉錄完成:', transcription);
+
+    // 準備錄音記錄
     const newRecording = {
       timestamp: Date.now(),
-      path: req.file.filename,
+      path: s3Result.Location,
       transcription
     };
 
-    // 查詢使用者和練習
+    // 更新用戶練習記錄
     const user = await User.findOne({ 'practices._id': req.body.practiceId });
     if (!user) {
-      throw new Error('User or Practice not found');
+      throw new Error('練習記錄未找到');
     }
 
-    // 找到目標練習
     const practice = user.practices.id(req.body.practiceId);
     if (!practice) {
-      throw new Error('Practice not found in user document');
+      throw new Error('練習記錄未找到');
     }
 
-    // 檢查是否已有相同的錄音
+    // 避免重複儲存
     const isDuplicate = practice.recordings.some(r => r.path === newRecording.path);
     if (!isDuplicate) {
-      practice.recordings.push(newRecording); // 僅新增新錄音
-      await user.save(); // 保存更新
-      console.log('新錄音已保存:', newRecording);
-    } else {
-      console.warn('錄音已存在，未重複保存:', newRecording.path);
+      practice.recordings.push(newRecording);
+      await user.save();
+      console.log('錄音記錄已保存');
     }
 
-    res.json({ text: transcription });
+    res.json({
+      success: true,
+      text: transcription,
+      path: s3Result.Location
+    });
+
   } catch (error) {
-    console.error('處理音頻時發生錯誤:', error);
-    res.status(500).json({ error: error.message });
+    console.error('音頻處理失敗:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '音頻處理失敗'
+    });
   }
 });
 
-/**
- * GET /recordings
- * 獲取當前對話的錄音歷史。
- */
+// 獲取錄音歷史
 router.get('/recordings', async (req, res) => {
   try {
-      const { practiceId } = req.query;
-      const user = await User.findOne({ 'practices._id': practiceId });
-      const practice = user.practices.id(practiceId);
-      
-      const formattedRecordings = (practice.recordings || []).map(recording => ({
-          timestamp: recording.timestamp,
-          path: `/recordings/${recording.path}`, // 修改為正確的靜態文件路徑
-          transcription: recording.transcription || ''
-      }));
+    const { practiceId } = req.query;
+    if (!practiceId) {
+      throw new Error('練習 ID 必須提供');
+    }
 
-      res.json({ success: true, recordings: formattedRecordings });
+    const user = await User.findOne({ 'practices._id': practiceId });
+    if (!user) {
+      throw new Error('找不到相關練習記錄');
+    }
+
+    const practice = user.practices.id(practiceId);
+    if (!practice) {
+      throw new Error('找不到相關練習記錄');
+    }
+
+    const formattedRecordings = practice.recordings.map(recording => ({
+      timestamp: recording.timestamp,
+      path: recording.path,
+      transcription: recording.transcription || ''
+    }));
+
+    res.json({
+      success: true,
+      recordings: formattedRecordings
+    });
+
   } catch (error) {
-      res.status(500).json({ error: error.message });
+    console.error('獲取錄音記錄失敗:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '獲取錄音記錄失敗'
+    });
   }
 });
-
 
 module.exports = router;

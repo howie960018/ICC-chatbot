@@ -1,65 +1,113 @@
-// app.js
-
 const os = require('os');
-// console.log('CPU 信息:', os.cpus());
-// console.log('總內存:', (os.totalmem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
-// console.log('可用內存:', (os.freemem() / 1024 / 1024 / 1024).toFixed(2), 'GB');
-// console.log('伺服器運行時間:', (os.uptime() / 3600).toFixed(2), '小時');
-// console.log('主機名稱:', os.hostname());
-// console.log('平台:', os.platform());
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const config = require('./config/config');
-const { recordingsDir } = require('./config/multerConfig');
-const { cleanupOldRecordings } = require('./utils/fileUtils');
-const audioRoutes = require('./routes/audioRoutes.js');
 const dialogueRoutes = require('./routes/dialogueRoutes');
 const pageRoutes = require('./routes/pageRoutes');
 const { connectDB } = require('./services/dbService');
-const app = express();
-
 const authMiddleware = require('./middleware/auth');
 const authRoutes = require('./routes/authRoutes');
+const audioRoutes = require('./routes/audioRoutes');
+const AWS = require('aws-sdk');
 
-// Middleware
-app.use(bodyParser.json());
+const app = express();
+
+// 驗證必要的環境變數
+const requiredEnvVars = [
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_REGION',
+  'S3_BUCKET_NAME'
+];
+
+requiredEnvVars.forEach(varName => {
+  if (!process.env[varName]) {
+    throw new Error(`環境變數 ${varName} 未設定`);
+  }
+});
+
+// AWS S3 配置
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+  params: {
+    Bucket: process.env.S3_BUCKET_NAME
+  }
+});
+
+// 基本中間件
+app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/recordings', express.static(recordingsDir));
 
+// CORS 設定 (如果需要)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH');
+    return res.status(200).json({});
+  }
+  next();
+});
 
-// 認證路由 (不需要驗證)
+// 安全性中間件
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// 路由
 app.use('/api/auth', authRoutes);
-
-// Routes
 app.use('/', pageRoutes);
-app.use('/api/audio', authMiddleware, audioRoutes);
+app.use('/api/audio', authMiddleware, (req, res, next) => {
+  req.s3 = s3; // 將 s3 實例注入請求對象
+  audioRoutes(req, res, next);
+});
 app.use('/api/dialogue', authMiddleware, dialogueRoutes);
 
-app.use(express.json());
-
-
-// Cleanup old recordings periodically
-setInterval(() => {
-  cleanupOldRecordings(recordingsDir, config.recordingsConfig.maxAge);
-}, config.recordingsConfig.cleanupInterval);
-
+// 練習相關路由
 const practiceRoutes = require('./routes/practiceRoutes');
 app.use('/api/practice', authMiddleware, practiceRoutes);
 
+// 添加 favicon 處理
+app.get('/favicon.ico', (req, res) => res.status(204));
 
-// 基本錯誤處理
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    message: '伺服器錯誤',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+// 404 處理
+app.use((req, res, next) => {
+  console.log('未找到路徑:', req.path); // 添加日誌來查看具體是哪個路徑找不到
+  res.status(404).json({
+      success: false,
+      message: '找不到請求的資源',
+      path: req.path
   });
 });
 
-// 啟動服務器
+// 錯誤處理中間件
+app.use((err, req, res, next) => {
+  console.error('錯誤:', {
+      path: req.path,
+      method: req.method,
+      error: err.message
+  });
+  
+  const status = err.status || 500;
+  const response = {
+      success: false,
+      message: err.message || '伺服器錯誤',
+  };
+
+  if (process.env.NODE_ENV === 'development') {
+      response.error = err.stack;
+  }
+
+  res.status(status).json(response);
+});
+
+// 伺服器啟動函數
 async function startServer() {
   try {
     // 連接資料庫
@@ -68,15 +116,26 @@ async function startServer() {
       throw new Error('資料庫連接失敗');
     }
 
-    // 啟動服務器
-    app.listen(config.port, () => {
-      console.log(`Server running on port ${config.port}`);
+    const port = config.port || 3000;
+    app.listen(port, () => {
+      console.log(`伺服器運行在 port ${port}`);
+      console.log('環境:', process.env.NODE_ENV || 'development');
     });
+
   } catch (error) {
-    console.error('Server startup failed:', error);
+    console.error('伺服器啟動失敗:', error);
     process.exit(1);
   }
 }
+
+// 優雅關閉
+process.on('SIGTERM', () => {
+  console.log('收到 SIGTERM 信號，準備關閉伺服器...');
+  server.close(() => {
+    console.log('伺服器已關閉');
+    process.exit(0);
+  });
+});
 
 startServer();
 

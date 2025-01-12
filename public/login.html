@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>溝通技巧訓練系統 - 登入/註冊</title>
+    <title>CommAI系統 - 登入/註冊</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -22,7 +22,7 @@
         }
 
         .site-banner {
-            background-color: #4CAF50; /* 綠色背景 */
+            background-color: #e93ae1; /* 綠色背景 */
             color: white; /* 文字白色 */
             text-align: center; /* 文字置中 */
             padding: 15px 0; /* 上下內邊距 */
@@ -63,8 +63,8 @@
         }
 
         .tab.active {
-            color: #4CAF50;
-            border-bottom: 2px solid #4CAF50;
+            color: #e93ae1;
+            border-bottom: 2px solid #e93ae1;
             margin-bottom: -2px;
         }
 
@@ -99,7 +99,7 @@
         }
 
         .form-control:focus {
-            border-color: #4CAF50;
+            border-color: #e93ae1;
             outline: none;
             box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
         }
@@ -107,7 +107,7 @@
         .btn {
             width: 100%;
             padding: 12px;
-            background: #4CAF50;
+            background: #e93ae1;
             border: none;
             border-radius: 5px;
             color: white;
@@ -118,7 +118,7 @@
         }
 
         .btn:hover {
-            background: #45a049;
+            background: #e93ae1;
         }
 
         .message {
@@ -137,7 +137,7 @@
 
         .message.success {
             background: #e8f5e9;
-            color: #2e7d32;
+            color: #e93ae1;
             display: block;
         }
 
@@ -192,16 +192,16 @@
             width: 20px;
             height: 20px;
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #4CAF50;
+            border-top: 3px solid #e93ae1;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
     </style>
 </head>
 <body>
-    <img src="/jpg/55.png" alt="Login Page Image" />
+    <img src="/jpg/commai.png" alt="Login Page Image" />
     <div class="site-banner">
-        ICC 親師溝通建置系統
+        CommAI系統
     </div>
     <div class="container">
 
@@ -229,7 +229,7 @@
 
                 <!-- 忘記密碼連結 -->
                 <div style="text-align: right; margin-bottom: 15px;">
-                    <a href="/forgot-password.html" style="color: #4CAF50; text-decoration: none; font-size: 14px;">
+                    <a href="/forgot-password.html" style="color: #e93ae1; text-decoration: none; font-size: 14px;">
                         忘記密碼？
                     </a>
                 </div>
@@ -341,13 +341,14 @@
             const data = await response.json();
             
             if (data.success) {
-                // 儲存 Token 和使用者名稱
+
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.user.username);
-
+                localStorage.setItem('userId', data.user.id);  // 保存用戶 ID
                 message.textContent = '登入成功！正在跳轉...';
                 message.classList.add('success');
                 setTimeout(() => window.location.href = '/test', 1000);
+                
             } else {
                 throw new Error(data.message || '登入失敗');
             }
