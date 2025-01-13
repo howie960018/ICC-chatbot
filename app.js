@@ -116,8 +116,8 @@ async function startServer() {
       throw new Error('資料庫連接失敗');
     }
 
-    //const port = config.port || 3000;
-    const port = 80;
+    const port = config.port || 3000;
+    //const port = 80;
     app.listen(port, () => {
       console.log(`伺服器運行在 port ${port}`);
       console.log('環境:', process.env.NODE_ENV || 'development');
