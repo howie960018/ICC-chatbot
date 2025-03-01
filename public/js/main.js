@@ -15,7 +15,7 @@ const difficultySelect = document.getElementById('difficultySelect');
 // 全局變數
 let countdownTimer = null; 
 let challengeTimer = null; // 挑戰倒計時計時器
-let countdownRemaining = 180; // 倒計時剩餘時間（以秒為單位）
+let countdownRemaining = 300; // 倒計時剩餘時間（以秒為單位）
 let mediaRecorder = null;
 let audioChunks = [];
 let dialogueCount = 0;
@@ -24,7 +24,7 @@ let submissionTimer = null;
 let currentDialogueRecordings = [];
 let isRecording = false;
 const maxDialogues = 12;
-const MAX_RECORDING_TIME = 20 * 1000; // 最大錄音時間，這裡設定為 20 秒
+const MAX_RECORDING_TIME = 120 * 1000; // 最大錄音時間，這裡設定為 120 秒
 let currentAccumulatedText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1019,7 +1019,7 @@ function stopCountdown() {
         clearInterval(challengeTimer);
         challengeTimer = null;
     }
-    countdownRemaining = 180; // 重置倒計時
+    countdownRemaining = 300; // 重置倒計時
 }
 
   
@@ -1073,10 +1073,10 @@ function resetCountdown() {
         clearInterval(challengeTimer);
         challengeTimer = null;
     }
-    countdownRemaining = 180; // 重置倒計時為初始值（3 分鐘）
+    countdownRemaining = 300; // 重置倒計時為初始值（5 分鐘）
     const countdownDisplay = document.getElementById('countdownDisplay');
     if (countdownDisplay) {
-        countdownDisplay.textContent = '倒計時: 3:00'; // 恢復倒計時初始狀態
+        countdownDisplay.textContent = '倒計時: 5:00'; // 恢復倒計時初始狀態
     }
 }
 
