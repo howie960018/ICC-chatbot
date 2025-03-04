@@ -160,11 +160,8 @@ async function loadPracticeDetails(practiceId) {
 
 
 
-// 顯示練習詳細資訊
+// 顯示練習詳細資訊並傳遞情境到重新練習函數
 function displayPracticeDetails(practice) {
-
-    
-
     // 示例：顯示練習溝通技巧和分析結果
     const techniqueDisplay = document.getElementById('scenarioDisplay');
 
@@ -172,10 +169,7 @@ function displayPracticeDetails(practice) {
         <p><strong>⭐ 溝通技巧：</strong>${practice.technique}</p>
         <p><strong>模式：</strong>${practice.difficulty || '簡單'}</p>
         <p><strong>📖 情境：</strong>${practice.scenario}</p>
-
     `;
-
-
 
     analysisContent.innerHTML = '';
     if (practice.analysis) {
@@ -226,7 +220,6 @@ function displayPracticeDetails(practice) {
     }
     
     const dialogueDisplay = document.getElementById('dialogueDisplay');
-
     
     // 美化對話記錄區域背景
     dialogueDisplay.style.backgroundColor = 'white'; // 背景色白色
@@ -236,63 +229,259 @@ function displayPracticeDetails(practice) {
     dialogueDisplay.style.marginTop = '20px'; // 與其他內容的間距
     dialogueDisplay.style.boxShadow = '0px 2px 5px rgba(0, 0, 0, 0.1)'; // 陰影效果
     
-    // 清空舊內容並插入對話
-    dialogueDisplay.innerHTML = ''; // 清空舊聊天記錄
+    // 清空舊內容
+    dialogueDisplay.innerHTML = ''; 
 
-    practice.history.forEach(entry => {
-        // 每條對話的角色 (家長或導師)
-        const message = document.createElement('div');
-        message.innerHTML = `<strong>${entry.role === '家長' ? '👨‍👩‍👧‍👦 家長' : '👨‍🏫 導師'}:</strong>`;
+    // 創建一個Set來記錄已經顯示過的對話，避免重複
+    const displayedDialogues = new Set();
 
-        // 對話內容
-        const content = document.createElement('div');
-        content.style.marginBottom = '20px'; // 添加空行間距
-        content.style.paddingLeft = '20px'; // 給內容留一點縮進，和角色標題分開
-        content.textContent = entry.content;
+    // 過濾並顯示不重複的對話
+    if (practice.history && Array.isArray(practice.history)) {
+        practice.history.forEach((entry, index) => {
+            // 創建一個唯一字符串來代表這條對話
+            const dialogueKey = `${entry.role}-${entry.content.substring(0, 50)}`;
+            
+            // 如果這條對話已經顯示過，則跳過
+            if (displayedDialogues.has(dialogueKey)) {
+                return;
+            }
+            
+            // 將此對話標記為已顯示
+            displayedDialogues.add(dialogueKey);
+            
+            // 創建對話元素
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+            
+            // 每條對話的角色 (家長或導師)
+            const messageHeader = document.createElement('div');
+            messageHeader.className = 'message-header';
+            messageHeader.innerHTML = `<strong>${entry.role === '家長' ? '👨‍👩‍👧‍👦 家長' : '👨‍🏫 導師'}:</strong>`;
+            
+            // 對話內容
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.style.marginBottom = '20px';
+            messageContent.style.paddingLeft = '20px';
+            messageContent.textContent = entry.content;
+            
+            // 添加到對話容器
+            messageContainer.appendChild(messageHeader);
+            messageContainer.appendChild(messageContent);
+            dialogueDisplay.appendChild(messageContainer);
+        });
+    }
 
-        // 加入對話顯示容器
-        dialogueDisplay.appendChild(message);
-        dialogueDisplay.appendChild(content);
+    // 先檢查並移除任何現有的重新練習按鈕容器
+    const existingRetryContainer = document.querySelector('.retry-button-container');
+    if (existingRetryContainer) {
+        existingRetryContainer.remove();
+    }
+    
+    // 添加重新練習按鈕
+    const retryButtonContainer = document.createElement('div');
+    retryButtonContainer.className = 'retry-button-container';
+    
+    const retryButton = document.createElement('button');
+    retryButton.textContent = '重新練習';
+    retryButton.className = 'retry-main-btn';
+    retryButton.addEventListener('click', async () => {
+        // 確保傳遞情境到重新練習函數
+        await retryPractice(practice._id, practice.scenario);
     });
+    
+    retryButtonContainer.appendChild(retryButton);
+    
+    // 添加到分析區域之後
+    const analysisDisplay = document.getElementById('analysisDisplay');
+    if (analysisDisplay.nextSibling) {
+        analysisDisplay.parentNode.insertBefore(retryButtonContainer, analysisDisplay.nextSibling);
+    } else {
+        analysisDisplay.parentNode.appendChild(retryButtonContainer);
+    }
 
     console.log('練習詳細資訊已載入'); // 測試是否正確載入
 }
 
-
-async function loadPractices() {
-    const token = localStorage.getItem('token'); // 從 LocalStorage 獲取 Token
-
+//0304重新練習
+async function retryPractice(practiceId, scenario) {
     try {
-        const response = await fetch('/api/practice/practices', {
-            headers: { Authorization: `Bearer ${token}` },
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/practice/practices/${practiceId}/retry`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('重新練習請求失敗');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.practice && data.practice._id) {
+        // 將新練習設置為當前練習
+        currentPracticeId = data.practice._id;
+        localStorage.setItem('currentPracticeId', data.practice._id);
+        
+        // 開始新的對話練習，傳遞原始情境
+        await startDialogue(data.practice._id, data.practice.scenario);
+        
+        // 提示用户
+        alert('已創建重新練習！');
+      } else {
+        throw new Error(data.message || '創建重新練習失敗');
+      }
+    } catch (error) {
+      console.error('重新練習失敗:', error);
+      alert('重新練習失敗: ' + error.message);
+    }
+  }
+
+// async function loadPractices() {
+//     const token = localStorage.getItem('token'); // 從 LocalStorage 獲取 Token
+
+//     try {
+//         const response = await fetch('/api/practice/practices', {
+//             headers: { Authorization: `Bearer ${token}` },
+//         });
+//         const data = await response.json();
+
+//         const practiceList = document.getElementById('practiceList'); // 獲取練習列表 DOM
+//         practiceList.innerHTML = ''; // 清空列表
+
+//         if (data.success && Array.isArray(data.practices) && data.practices.length > 0) {
+//             data.practices.forEach(practice => {
+//                 // 創建列表項目
+//                 const listItem = document.createElement('li');
+//                 listItem.classList.add('practice-item');
+//                 listItem.setAttribute('data-practice-id', practice._id);
+//                 listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleDateString('zh-TW')}`;
+
+//                 // 綁定點擊事件到列表項目
+//                 listItem.addEventListener('click', async () => {
+//                     // 取消其他項目選中樣式
+//                     document.querySelectorAll('.practice-item').forEach(item => {
+//                         item.classList.remove('selected');
+//                     });
+
+//                     // 標記當前項目為選中
+//                     listItem.classList.add('selected');
+
+//                     // 呼叫選取練習的邏輯
+//                     await selectPractice(practice._id);
+//                 });
+
+//                 // 添加刪除按鈕
+//                 const deleteButton = document.createElement('button');
+//                 deleteButton.textContent = '刪除';
+//                 deleteButton.classList.add('small-btn');
+//                 deleteButton.addEventListener('click', async (e) => {
+//                     e.stopPropagation(); // 防止點擊刪除按鈕時觸發列表項點擊事件
+//                     if (confirm('確認刪除此練習紀錄？')) {
+//                         await deletePractice(practice._id);
+//                         await loadPractices(); // 重新加載列表
+//                     }
+//                 });
+
+//                 //listItem.appendChild(deleteButton); // 添加刪除按鈕到項目
+//                 practiceList.appendChild(listItem); // 將項目加入列表
+//             });
+//         } else {
+//             practiceList.innerHTML = '<li>目前無練習記錄</li>';
+//         }
+//     } catch (error) {
+//         console.error('載入練習失敗:', error);
+//         practiceList.innerHTML = '<li class="error-message">載入練習時發生錯誤</li>';
+//     }
+// }
+
+
+// 0304修改 displayFilteredPractices 函數，在練習項目中添加重新練習標記
+function displayFilteredPractices(practices) {
+    const practiceList = document.getElementById('practiceList');
+    practiceList.innerHTML = '';
+    
+    // 增加格式檢查
+    if (!Array.isArray(practices)) {
+        console.error('練習資料不是陣列', practices);
+        practiceList.innerHTML = '<li class="error-message">練習資料格式不正確</li>';
+        return;
+    }
+    
+    if (practices.length === 0) {
+        practiceList.innerHTML = '<li class="no-practice">沒有符合條件的練習</li>';
+        return;
+    }
+    
+    try {
+        // 按日期排序，最新的在前
+        practices.sort((a, b) => {
+            try {
+                return new Date(b.createdAt) - new Date(a.createdAt);
+            } catch (error) {
+                return 0; // 如果日期無效，保持原順序
+            }
         });
-        const data = await response.json();
-
-        const practiceList = document.getElementById('practiceList'); // 獲取練習列表 DOM
-        practiceList.innerHTML = ''; // 清空列表
-
-        if (data.success && Array.isArray(data.practices) && data.practices.length > 0) {
-            data.practices.forEach(practice => {
+        
+        practices.forEach(practice => {
+            try {
                 // 創建列表項目
                 const listItem = document.createElement('li');
                 listItem.classList.add('practice-item');
+                
+                // 如果是重新練習，添加標識類
+                if (practice.isRetry) {
+                    listItem.classList.add('retry');
+                }
+                
                 listItem.setAttribute('data-practice-id', practice._id);
-                listItem.textContent = `${practice.technique} - ${new Date(practice.createdAt).toLocaleDateString('zh-TW')}`;
-
+                
+                // 格式化日期
+                let practiceDate = '未知日期';
+                try {
+                    if (practice.createdAt) {
+                        practiceDate = new Date(practice.createdAt).toLocaleDateString('zh-TW');
+                    }
+                } catch (e) {
+                    console.warn('日期格式化錯誤', e);
+                }
+                
+                // 截取情境的前20個字元，如果太長就加上省略號
+                const scenarioPreview = practice.scenario 
+                    ? (practice.scenario.length > 20 ? practice.scenario.substring(0, 20) + '...' : practice.scenario)
+                    : '無情境';
+                
+                // 設置練習顯示內容：技巧 - 日期 - 情境預覽
+                let titleContent = `${practice.technique || '未知技巧'} - ${practiceDate}`;
+                
+                // 如果是重新練習，添加標記
+                if (practice.isRetry) {
+                    titleContent += `<span class="retry-badge">重新練習</span>`;
+                }
+                
+                listItem.innerHTML = `
+                    <div class="practice-item-title">${titleContent}</div>
+                    <div class="practice-item-scenario">${scenarioPreview}</div>
+                    <div class="practice-item-badge ${practice.difficulty === '挑戰' ? 'challenge' : 'basic'}">${practice.difficulty === '挑戰' ? '挑戰' : '基礎'}</div>
+                `;
+                
                 // 綁定點擊事件到列表項目
                 listItem.addEventListener('click', async () => {
                     // 取消其他項目選中樣式
                     document.querySelectorAll('.practice-item').forEach(item => {
                         item.classList.remove('selected');
                     });
-
+                    
                     // 標記當前項目為選中
                     listItem.classList.add('selected');
-
+                    
                     // 呼叫選取練習的邏輯
                     await selectPractice(practice._id);
                 });
-
+                
                 // 添加刪除按鈕
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = '刪除';
@@ -304,17 +493,289 @@ async function loadPractices() {
                         await loadPractices(); // 重新加載列表
                     }
                 });
-
-                //listItem.appendChild(deleteButton); // 添加刪除按鈕到項目
+                
+                listItem.appendChild(deleteButton); // 添加刪除按鈕到項目
                 practiceList.appendChild(listItem); // 將項目加入列表
-            });
-        } else {
-            practiceList.innerHTML = '<li>目前無練習記錄</li>';
+            } catch (error) {
+                console.error('處理練習項目時發生錯誤:', error, practice);
+            }
+        });
+    } catch (error) {
+        console.error('顯示練習列表時發生錯誤:', error);
+        practiceList.innerHTML = '<li class="error-message">顯示練習時發生錯誤</li>';
+    }
+}
+
+
+//0301修改
+async function loadPractices() {
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch('/api/practice/practices', {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
         }
+        
+        // 嘗試解析 JSON 回應
+        const data = await response.json();
+        console.log('API 回應數據:', data); // 調試用，查看實際數據格式
+
+        // 獲取練習列表容器
+        const practiceList = document.getElementById('practiceList');
+        const practiceSearchContainer = document.getElementById('practiceSearchContainer');
+        
+        // 確保創建或清空搜尋容器
+        if (!practiceSearchContainer) {
+            // 創建搜尋和篩選容器
+            const searchContainer = document.createElement('div');
+            searchContainer.id = 'practiceSearchContainer';
+            searchContainer.classList.add('practice-search-container');
+            
+            // 創建搜尋框
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.id = 'practiceSearchInput';
+            searchInput.placeholder = '搜尋練習...';
+            searchInput.classList.add('practice-search-input');
+            
+            // 創建日期篩選下拉選單
+            const dateFilter = document.createElement('select');
+            dateFilter.id = 'practiceDateFilter';
+            dateFilter.classList.add('practice-filter');
+            
+            const dateOptions = [
+                { value: 'all', text: '所有日期' },
+                { value: 'today', text: '今天' },
+                { value: 'week', text: '本週' },
+                { value: 'month', text: '本月' }
+            ];
+            
+            dateOptions.forEach(option => {
+                const optElement = document.createElement('option');
+                optElement.value = option.value;
+                optElement.textContent = option.text;
+                dateFilter.appendChild(optElement);
+            });
+            
+            // 創建技巧篩選下拉選單
+            const techniqueFilter = document.createElement('select');
+            techniqueFilter.id = 'practiceTechniqueFilter';
+            techniqueFilter.classList.add('practice-filter');
+            
+            const techniqueOptions = [
+                { value: 'all', text: '所有技巧' },
+                { value: '我訊息', text: '我訊息' },
+                { value: '三明治溝通法', text: '三明治溝通法' },
+                { value: '綜合溝通技巧', text: '綜合溝通技巧' }
+            ];
+            
+            techniqueOptions.forEach(option => {
+                const optElement = document.createElement('option');
+                optElement.value = option.value;
+                optElement.textContent = option.text;
+                techniqueFilter.appendChild(optElement);
+            });
+            
+            // 創建難度篩選下拉選單
+            const difficultyFilter = document.createElement('select');
+            difficultyFilter.id = 'practiceDifficultyFilter';
+            difficultyFilter.classList.add('practice-filter');
+            
+            const difficultyOptions = [
+                { value: 'all', text: '所有模式' },
+                { value: '簡單', text: '基礎模式' },
+                { value: '挑戰', text: '挑戰模式' }
+            ];
+            
+            difficultyOptions.forEach(option => {
+                const optElement = document.createElement('option');
+                optElement.value = option.value;
+                optElement.textContent = option.text;
+                difficultyFilter.appendChild(optElement);
+            });
+            
+            // 添加事件監聽器
+            searchInput.addEventListener('input', filterPractices);
+            dateFilter.addEventListener('change', filterPractices);
+            techniqueFilter.addEventListener('change', filterPractices);
+            difficultyFilter.addEventListener('change', filterPractices);
+            
+            // 將所有元素添加到搜尋容器
+            searchContainer.appendChild(searchInput);
+            searchContainer.appendChild(dateFilter);
+            searchContainer.appendChild(techniqueFilter);
+            searchContainer.appendChild(difficultyFilter);
+            
+            // 將搜尋容器添加到練習列表前
+            practiceList.parentNode.insertBefore(searchContainer, practiceList);
+        }
+        
+        // 清空練習列表
+        practiceList.innerHTML = '';
+
+        // 處理不同的API回應格式
+        let practices = [];
+        if (Array.isArray(data)) {
+            // 如果直接返回了數組
+            practices = data;
+        } else if (data.success && Array.isArray(data.practices)) {
+            // 如果符合原始格式
+            practices = data.practices;
+        } else if (data.total !== undefined && Array.isArray(data.practices)) {
+            // 如果符合新格式
+            practices = data.practices;
+        } else {
+            console.error('未知的API回應格式', data);
+            practiceList.innerHTML = '<li class="error-message">API回應格式異常</li>';
+            return;
+        }
+        
+        // 過濾已有分析結果的練習
+        let analyzedPractices = practices.filter(practice => {
+            // 檢查是否有分析結果 (包括空字串或null之外的任何值)
+            return practice.analysis !== undefined && practice.analysis !== null && practice.analysis !== '';
+        });
+        
+        console.log(`找到 ${analyzedPractices.length} 個有分析結果的練習`);
+
+        if (analyzedPractices.length === 0) {
+            practiceList.innerHTML = '<li class="no-practice">尚無完成的練習記錄</li>';
+            
+            // 顯示引導訊息
+            const emptyPracticesGuide = document.getElementById('emptyPracticesGuide');
+            if (emptyPracticesGuide) {
+                emptyPracticesGuide.style.display = 'block';
+                practiceList.style.display = 'none';
+            }
+            
+            return;
+        } else {
+            // 隱藏引導訊息
+            const emptyPracticesGuide = document.getElementById('emptyPracticesGuide');
+            if (emptyPracticesGuide) {
+                emptyPracticesGuide.style.display = 'none';
+                practiceList.style.display = 'block';
+            }
+        }
+        
+        // 儲存所有練習資料到全局變數，方便篩選時使用
+        window.practicesData = analyzedPractices;
+        
+        // 更新練習計數
+        const practicesCount = document.getElementById('practicesCount');
+        if (practicesCount) {
+            practicesCount.textContent = `(${analyzedPractices.length})`;
+        }
+        
+        // 初始顯示所有符合條件的練習
+        displayFilteredPractices(analyzedPractices);
+        
     } catch (error) {
         console.error('載入練習失敗:', error);
-        practiceList.innerHTML = '<li class="error-message">載入練習時發生錯誤</li>';
+        const practiceList = document.getElementById('practiceList');
+        practiceList.innerHTML = '<li class="error-message">載入練習時發生錯誤: ' + error.message + '</li>';
     }
+}
+
+// 根據篩選條件顯示練習
+function filterPractices() {
+    if (!window.practicesData) return;
+    
+    const searchText = document.getElementById('practiceSearchInput').value.toLowerCase();
+    const dateFilter = document.getElementById('practiceDateFilter').value;
+    const techniqueFilter = document.getElementById('practiceTechniqueFilter').value;
+    const difficultyFilter = document.getElementById('practiceDifficultyFilter').value;
+    
+    // 篩選練習
+    let filteredPractices = window.practicesData.filter(practice => {
+        // 搜尋關鍵字篩選
+        const scenarioMatch = practice.scenario && practice.scenario.toLowerCase().includes(searchText);
+        const techniqueMatch = practice.technique && practice.technique.toLowerCase().includes(searchText);
+        const hasSearchText = !searchText || scenarioMatch || techniqueMatch;
+        
+        // 日期篩選
+        let passDateFilter = true;
+        if (dateFilter !== 'all') {
+            const practiceDate = new Date(practice.createdAt);
+            const today = new Date();
+            
+            if (dateFilter === 'today') {
+                passDateFilter = isSameDay(practiceDate, today);
+            } else if (dateFilter === 'week') {
+                passDateFilter = isThisWeek(practiceDate, today);
+            } else if (dateFilter === 'month') {
+                passDateFilter = isSameMonth(practiceDate, today);
+            }
+        }
+        
+        // 技巧篩選
+        const passTechniqueFilter = techniqueFilter === 'all' || practice.technique === techniqueFilter;
+        
+        // 難度篩選
+        const passDifficultyFilter = difficultyFilter === 'all' || practice.difficulty === difficultyFilter;
+        
+        return hasSearchText && passDateFilter && passTechniqueFilter && passDifficultyFilter;
+    });
+    
+    // 顯示篩選後的練習
+    displayFilteredPractices(filteredPractices);
+}
+
+
+
+// 修正 API 路由檢查以更好地處理回應格式問題
+async function fixPracticeRoutes() {
+    try {
+        const response = await fetch('/api/practice/practices', {
+            method: 'GET',
+            headers: { 
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        // 檢查回應結構
+        const data = await response.json();
+        console.log('API 回應檢查:', data);
+        
+        // 根據回應格式，可能需要在伺服器端修復 API 或在前端適應不同格式
+    } catch (error) {
+        console.error('API 檢查失敗:', error);
+    }
+}
+
+
+// 日期輔助函數：檢查是否為同一天
+function isSameDay(date1, date2) {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+}
+
+// 日期輔助函數：檢查是否在同一週
+function isThisWeek(date, today) {
+    const firstDayOfWeek = new Date(today);
+    const day = today.getDay() || 7; // 若 today 是周日，getDay() 會返回 0
+    firstDayOfWeek.setDate(today.getDate() - day + 1); // 設置為本週一
+    
+    const lastDayOfWeek = new Date(firstDayOfWeek);
+    lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6); // 設置為本週日
+    
+    return date >= firstDayOfWeek && date <= lastDayOfWeek;
+}
+
+// 日期輔助函數：檢查是否在同一月
+function isSameMonth(date, today) {
+    return date.getFullYear() === today.getFullYear() &&
+           date.getMonth() === today.getMonth();
 }
 
 
@@ -757,7 +1218,107 @@ startPracticeBtn.addEventListener('click', async () => {
     }
 });
 
-async function startDialogue(practiceId) {
+// async function startDialogue(practiceId) {
+//     if (!checkAuthStatus()) {
+//         return;
+//     }
+
+//     const scenarioDisplay = document.getElementById('scenarioDisplay');
+//     const dialogueDisplay = document.getElementById('dialogueDisplay');
+
+//     scenarioDisplay.innerHTML = '';
+//     dialogueDisplay.innerHTML = '';
+
+//     enableUserInput();
+
+//     const spinner = document.getElementById('loadingSpinner');
+//     spinner.classList.add('spinner-visible');
+
+//     try {
+//         // 檢查是否有選擇溝通技巧
+//         const technique = techniqueSelect.value;
+//         const difficulty = difficultySelect.value;
+
+//         dialogueCount = 0; // 重置對話計數
+
+//         if (!technique) {
+//             throw new Error('請選擇溝通技巧');
+//         }
+
+//         console.log('發送開始對話請求，參數:', {
+//             technique,
+//             difficulty,
+//             practiceId
+//         }); 
+
+//         // 檢查是否已經有練習記錄
+//         const response = await fetch('/api/dialogue/start-dialogue', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${localStorage.getItem('token')}`
+//             },
+//             body: JSON.stringify({ 
+//                 technique,
+//                 difficulty,
+//                 practiceId
+//             }),
+//         });
+
+//         if (!response.ok) {
+//             const errorData = await response.json();
+//             throw new Error(errorData.error || '開始對話失敗');
+//         }
+
+//         const data = await response.json();
+        
+//         scenarioDisplay.innerHTML = `
+//             <div class="message-header">📝 情境</div>
+//             <div class="message-content">${data.scenario || '無法載入情境'}</div>
+//         `;
+
+//         dialogueDisplay.innerHTML = `
+//             <div class="message suggestion">
+//                 <div class="message-header">💡 建議開場白</div>
+//                 <div class="message-content">${data.teacherSuggestion || '無建議開場白'}</div>
+//             </div>
+//             <div class="message 家長">
+//                 <div class="message-header" style="text-align: left">👤 家長</div>
+//                 <div class="message-content">${data.response || '無回應'}</div>
+//                 <div class="message-time" style="text-align: left">${new Date().toLocaleTimeString()}</div>
+//             </div>
+//         `;
+
+//         // 啟動挑戰模式倒計時
+//         if (difficulty === '挑戰') {
+//             startCountdown();
+//         }
+
+//     } catch (error) {
+//         console.error('開始對話失敗:', error);
+//         alert(error.message);
+//         scenarioDisplay.innerHTML = `
+//             <div class="message error">
+//                 <div class="message-header">❌ 錯誤</div>
+//                 <div class="message-content">${error.message}</div>
+//             </div>
+//         `;
+//     } finally {
+//         // 隱藏 loading spinner
+//         spinner.classList.remove('spinner-visible');
+//     }
+// }
+
+// 0301更新 startDialogue 函數，確保練習完成後才添加到練習列表
+
+
+
+// 0301處理對話結束時，更新練習列表
+
+// 更新 startDialogue 函數，支持指定情境
+
+// 確保 startDialogue 函數在任何地方都使用指定的情境
+async function startDialogue(practiceId, specifiedScenario = null) {
     if (!checkAuthStatus()) {
         return;
     }
@@ -787,7 +1348,8 @@ async function startDialogue(practiceId) {
         console.log('發送開始對話請求，參數:', {
             technique,
             difficulty,
-            practiceId
+            practiceId,
+            specifiedScenario  // 關鍵: 傳遞指定情境
         }); 
 
         // 檢查是否已經有練習記錄
@@ -800,7 +1362,8 @@ async function startDialogue(practiceId) {
             body: JSON.stringify({ 
                 technique,
                 difficulty,
-                practiceId
+                practiceId,
+                specifiedScenario  // 關鍵: 傳遞指定情境
             }),
         });
 
@@ -848,9 +1411,59 @@ async function startDialogue(practiceId) {
     }
 }
 
+async function handleDialogueEnd(practiceId, analysis) {
+    // 更新練習記錄
+    try {
+        await fetch(`/api/practice/practices/${practiceId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ analysis }),
+        });
+        
+        // 重新加載練習列表
+        await loadPractices();
+        
+        // 自動選擇剛完成的練習
+        const practiceItems = document.querySelectorAll('.practice-item');
+        for (const item of practiceItems) {
+            if (item.getAttribute('data-practice-id') === practiceId) {
+                item.click();
+                break;
+            }
+        }
+    } catch (error) {
+        console.error('更新練習記錄失敗:', error);
+    }
+}
 
 // 初始化
+// document.addEventListener('DOMContentLoaded', async () => {
+
+    
+//     if (!checkAuthStatus()) {
+//         return;
+//     }
+
+//     await loadPractices();
+//     currentPracticeId = localStorage.getItem('currentPracticeId');
+
+//     if (currentPracticeId) {
+//         await loadPracticeDetails(currentPracticeId);
+//         await loadRecordingsHistory(currentPracticeId);
+//     }
+
+   
+// });
+
+//0301新增
 document.addEventListener('DOMContentLoaded', async () => {
+    // 先診斷練習 API
+    await fixPracticeRoutes();
+    
+    // 然後正常初始化
     if (!checkAuthStatus()) {
         return;
     }
@@ -858,15 +1471,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPractices();
     currentPracticeId = localStorage.getItem('currentPracticeId');
 
-
-
-    if (currentPracticeId) {
-        await loadPracticeDetails(currentPracticeId);
-        await loadRecordingsHistory(currentPracticeId);
+    // 顯示空練習提示
+    const practiceList = document.getElementById('practiceList');
+    const emptyPracticesGuide = document.getElementById('emptyPracticesGuide');
+    
+    if (practiceList.children.length === 0 || practiceList.innerHTML.includes('尚無練習記錄')) {
+        if (emptyPracticesGuide) {
+            emptyPracticesGuide.style.display = 'block';
+            practiceList.style.display = 'none';
+        }
+    } else {
+        if (emptyPracticesGuide) {
+            emptyPracticesGuide.style.display = 'none';
+            practiceList.style.display = 'block';
+        }
     }
 
-   
-    
+    if (currentPracticeId) {
+        try {
+            await loadPracticeDetails(currentPracticeId);
+            await loadRecordingsHistory(currentPracticeId);
+        } catch (error) {
+            console.error('載入練習詳情失敗:', error);
+            alert('載入練習詳情失敗，請重新選擇練習');
+            localStorage.removeItem('currentPracticeId');
+            currentPracticeId = null;
+        }
+    }   
 });
 
 // 分析相關函數
@@ -915,6 +1546,80 @@ async function loadRecordingsHistory(practiceId) {
 }
 
 
+// async function handleSubmission(text) {
+//     try {
+//         const difficulty = difficultySelect.value;
+        
+//         isWaitingForSubmission = false;
+//         clearTranscriptionPreview();
+        
+//         recordStatus.textContent = '正在等待 AI 回應...';
+        
+//         if (!text || text.trim().length === 0) {
+//             throw new Error('提交的文字內容為空');
+//         }
+
+//         updateDialogueDisplay("老師", text);
+
+//         const response = await fetch('/api/dialogue/continue-dialogue', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${localStorage.getItem('token')}`
+//             },
+//             body: JSON.stringify({
+//                 userResponse: text,
+//                 practiceId: currentPracticeId,
+//                 challengeTimeOver: false
+//             })
+//         });
+
+//         if (!response.ok) {
+//             throw new Error('API 請求失敗');
+//         }
+
+//         const data = await response.json();
+
+//         if (!data) {
+//             throw new Error('無效的回應數據');
+//         }
+
+//         // 檢查回應格式
+//         if (difficulty === '簡單') {
+//             if (data.completed && data.analysis) {
+//                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+//                 disableUserInput();
+//             } else if (data.response) {
+//                 updateDialogueDisplay("家長", data.response);
+//                 if (dialogueCount >= maxDialogues) {
+//                     disableUserInput();
+//                     showEndDialogueMessage();
+//                 } else {
+//                     recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+//                     enableUserInput();
+//                 }
+//             }
+//         } else if (difficulty === '挑戰') {
+//             if (data.completed && data.analysis) {
+//                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+//                 disableUserInput();
+//             } else if (data.response) {
+//                 updateDialogueDisplay("家長", data.response);
+//                 recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+//                 enableUserInput();
+//             }
+//         }
+
+//         currentAccumulatedText = '';
+        
+//     } catch (error) {
+//         console.error('對話提交錯誤:', error);
+//         recordStatus.textContent = `錯誤：${error.message}`;
+//         enableUserInput();
+//     }
+// }
+
+//0301 更新
 async function handleSubmission(text) {
     try {
         const difficulty = difficultySelect.value;
@@ -922,7 +1627,7 @@ async function handleSubmission(text) {
         isWaitingForSubmission = false;
         clearTranscriptionPreview();
         
-        recordStatus.textContent = '正在等待 AI 回應...';
+        recordStatus.textContent = ' AI 分析中...';
         
         if (!text || text.trim().length === 0) {
             throw new Error('提交的文字內容為空');
@@ -958,6 +1663,8 @@ async function handleSubmission(text) {
             if (data.completed && data.analysis) {
                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
                 disableUserInput();
+                // 處理對話結束，更新練習列表
+                await handleDialogueEnd(currentPracticeId, data.analysis);
             } else if (data.response) {
                 updateDialogueDisplay("家長", data.response);
                 if (dialogueCount >= maxDialogues) {
@@ -972,6 +1679,8 @@ async function handleSubmission(text) {
             if (data.completed && data.analysis) {
                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
                 disableUserInput();
+                // 處理對話結束，更新練習列表
+                await handleDialogueEnd(currentPracticeId, data.analysis);
             } else if (data.response) {
                 updateDialogueDisplay("家長", data.response);
                 recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
@@ -985,6 +1694,43 @@ async function handleSubmission(text) {
         console.error('對話提交錯誤:', error);
         recordStatus.textContent = `錯誤：${error.message}`;
         enableUserInput();
+    }
+}
+
+// 0301更新挑戰模式結束邏輯函數
+async function handleChallengeEnd() {
+    try {
+        disableUserInput();
+        recordStatus.textContent = '挑戰模式已結束，正在分析對話...';
+
+        // 請求後端進行分析
+        const response = await fetch('/api/dialogue/continue-dialogue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                userResponse: "", 
+                practiceId: currentPracticeId,
+                challengeTimeOver: true
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.analysis) {
+            analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+            // 處理對話結束，更新練習列表
+            await handleDialogueEnd(currentPracticeId, data.analysis);
+        } else {
+            analysisContent.innerHTML = '<p>未獲得分析結果，請稍後再試。</p>';
+        }
+
+        showEndDialogueMessage(); // 顯示對話結束訊息
+    } catch (error) {
+        console.error('挑戰模式結束時發生錯誤:', error);
+        recordStatus.textContent = '分析失敗，請重試';
     }
 }
 

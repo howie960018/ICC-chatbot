@@ -598,6 +598,248 @@ audio {
     display: block; /* 保證圖片是塊級元素，配合 margin 居中 */
 }
 
+/* 練習搜尋與篩選容器樣式 */
+.practice-search-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.practice-search-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+}
+
+.practice-search-input:focus {
+    outline: none;
+    border-color: #e93ae1;
+    box-shadow: 0 0 3px rgba(233, 58, 225, 0.3);
+}
+
+.practice-filter {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.practice-filter:focus {
+    outline: none;
+    border-color: #e93ae1;
+}
+
+/* 練習項目樣式改進 */
+.practice-item {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.practice-item:hover {
+    background-color: #f0e6f0;
+    transform: translateY(-2px);
+}
+
+.practice-item.selected {
+    background-color: #e93ae1;
+    color: white;
+}
+
+.practice-item-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.practice-item-scenario {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.practice-item.selected .practice-item-scenario {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.practice-item-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.practice-item-badge.basic {
+    background-color: #4caf50;
+    color: white;
+}
+
+.practice-item-badge.challenge {
+    background-color: #ff5722;
+    color: white;
+}
+
+.small-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    background-color: transparent;
+    color: #f44336;
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.small-btn:hover {
+    background-color: #f44336;
+    color: white;
+}
+
+.practice-item.selected .small-btn {
+    border-color: white;
+    color: white;
+}
+
+.practice-item.selected .small-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.no-practice {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+/* 當沒有練習時的提示樣式 */
+.empty-practices-message {
+    text-align: center;
+    padding: 30px 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    margin: 20px 0;
+    color: #666;
+}
+
+.empty-practices-message p {
+    margin-bottom: 15px;
+}
+
+.empty-practices-message .guide-step {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.guide-step-number {
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    line-height: 25px;
+    text-align: center;
+    background-color: #e93ae1;
+    color: white;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+
+/* 重新練習按鈕容器 */
+.retry-button-container {
+    margin: 20px 0;
+    text-align: center;
+  }
+  
+  /* 主要重新練習按鈕 */
+  .retry-main-btn {
+    padding: 12px 24px;
+    background-color: #e93ae1;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  }
+  
+  .retry-main-btn:hover {
+    background-color: #c81fb3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .retry-main-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* 重新練習標記樣式 - 應用於有重新練習標識的練習項目 */
+  .practice-item.retry {
+    border-left: 4px solid #e93ae1;
+  }
+  
+  .retry-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    background-color: #e93ae1;
+    color: white;
+    margin-left: 8px;
+  }
+  
+  /* 響應式調整 */
+  @media (max-width: 768px) {
+    .retry-main-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+  }
+
+/* 自適應樣式 */
+@media (max-width: 768px) {
+    .practice-search-container {
+        padding: 10px;
+    }
+    
+    .practice-item {
+        padding: 10px;
+    }
+    
+    .practice-item-badge {
+        top: 8px;
+        right: 8px;
+        padding: 2px 6px;
+        font-size: 10px;
+    }
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -606,6 +848,8 @@ audio {
 .spinner-visible {
     display: flex;
 }
+
+
 
 /* 響應式設計 */
 @media (max-width: 1200px) {

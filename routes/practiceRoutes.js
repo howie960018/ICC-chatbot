@@ -12,16 +12,100 @@ const {
 } = require('../services/practiceService');
 
 // 獲取所有練習
+// router.get('/practices', async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+    
+//     const practices = await getPractices(userId);
+//     res.json({ success: true, practices });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// });
+
+//301更新
 router.get('/practices', async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user ? req.user.id : null;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "未授權訪問" });
+    }
+
+    const { technique, difficulty, dateRange, searchQuery, completed } = req.query;
+
+    let practices = await getPractices(userId) || [];
+    let filteredPractices = [...practices]; // 創建副本以便篩選
+
+    // 篩選條件應用
+    if (filteredPractices.length > 0) {
+      // 只篩選已完成分析的練習（如果指定了該條件）
+      if (completed === 'true') {
+        filteredPractices = filteredPractices.filter(practice => practice.analysis);
+      }
+
+      // 技巧篩選
+      if (technique && technique !== 'all') {
+        filteredPractices = filteredPractices.filter(practice => practice.technique === technique);
+      }
+
+      // 難度篩選
+      if (difficulty && difficulty !== 'all') {
+        filteredPractices = filteredPractices.filter(practice => practice.difficulty === difficulty);
+      }
+
+      // 日期範圍篩選
+      if (dateRange && dateRange !== 'all') {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        filteredPractices = filteredPractices.filter(practice => {
+          const practiceDate = new Date(practice.createdAt);
+
+          if (dateRange === 'today') {
+            return practiceDate >= today;
+          } else if (dateRange === 'week') {
+            const firstDayOfWeek = new Date(today);
+            const day = today.getDay() || 7;
+            firstDayOfWeek.setUTCDate(today.getUTCDate() - day + 1);
+            return practiceDate >= firstDayOfWeek;
+          } else if (dateRange === 'month') {
+            const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return practiceDate >= firstDayOfMonth;
+          }
+          return true;
+        });
+      }
+
+      // 關鍵字搜尋
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase();
+        filteredPractices = filteredPractices.filter(practice => {
+          const scenarioMatch = practice.scenario && practice.scenario.toLowerCase().includes(query);
+          const techniqueMatch = practice.technique && practice.technique.toLowerCase().includes(query);
+          const historyMatch = Array.isArray(practice.history) &&
+            practice.history.some(entry => entry.content && entry.content.toLowerCase().includes(query));
+
+          return scenarioMatch || techniqueMatch || historyMatch;
+        });
+      }
+    }
+
+    // 使用與原始代碼一致的格式返回結果
+    return res.json({ 
+      success: true, 
+      practices: filteredPractices,
+      total: filteredPractices.length
+    });
     
-    const practices = await getPractices(userId);
-    res.json({ success: true, practices });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error fetching practices:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || "伺服器內部錯誤"
+    });
   }
 });
+
 
 // 創建新練習
 router.post('/practices', async (req, res) => {
@@ -182,6 +266,52 @@ router.get('/:practiceId/feedback', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('獲取心得失敗:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 0304更新
+
+// 重新練習（基於現有練習創建新練習）
+router.post('/practices/:id/retry', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const originalPracticeId = req.params.id;
+    
+    // 獲取原始練習詳情
+    const originalPractice = await getPracticeDetails(userId, originalPracticeId);
+    
+    if (!originalPractice) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到原始練習記錄'
+      });
+    }
+    
+    // 創建新練習，帶有與原始練習相同的技巧、難度和情境
+    const newPractice = await createPractice(userId, {
+      technique: originalPractice.technique,
+      difficulty: originalPractice.difficulty,
+      scenario: originalPractice.scenario,       // 保留相同的情境
+      isRetry: true,
+      originalPracticeId: originalPracticeId     // 記錄原始練習ID
+    });
+    
+    if (!newPractice || !newPractice._id) {
+      throw new Error('重新練習創建失敗');
+    }
+    
+    res.status(201).json({
+      success: true,
+      practice: newPractice,
+      message: '已創建重新練習'
+    });
+    
+  } catch (error) {
+    console.error('重新練習創建失敗:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '重新練習創建失敗'
+    });
   }
 });
 

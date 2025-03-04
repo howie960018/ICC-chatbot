@@ -27,11 +27,28 @@ async function updatePractice(practiceId, updates) {
           throw new Error('練習不存在');
       }
 
+      // 修改歷史記錄更新方式，防止重複添加
       if (updatesObj.history) {
           if (!Array.isArray(practice.history)) {
               practice.history = [];
           }
-          practice.history = [...practice.history, ...updatesObj.history];
+          
+          // 如果選擇直接覆蓋歷史記錄
+          // 方案1: 直接覆蓋 - 如果希望完全替換舊記錄
+          practice.history = updatesObj.history;
+          
+          // 方案2: 智能合併 - 如果需要保留之前記錄並添加新記錄
+          // 首先檢查新歷史記錄中是否有項目不在舊記錄中
+          // const existingEntries = new Set(practice.history.map(entry => 
+          //    `${entry.role}:${entry.content.substring(0, 50)}`
+          // ));
+          
+          // const newEntries = updatesObj.history.filter(entry => {
+          //    const entryKey = `${entry.role}:${entry.content.substring(0, 50)}`;
+          //    return !existingEntries.has(entryKey);
+          // });
+          
+          // practice.history = [...practice.history, ...newEntries];
       }
 
       if (updatesObj.scenario) {
@@ -43,9 +60,11 @@ async function updatePractice(practiceId, updates) {
       if (updatesObj.analysis) {
           practice.analysis = updatesObj.analysis;
       }
-
-      if (updatesObj.difficulty) { // 新增對 difficulty 的更新
-        practice.difficulty = updatesObj.difficulty;
+      if (updatesObj.difficulty) {
+          practice.difficulty = updatesObj.difficulty;
+      }
+      if (updatesObj.completed !== undefined) {
+          practice.completed = updatesObj.completed;
       }
 
       console.log('練習更新前的內容:', practice);
@@ -55,10 +74,8 @@ async function updatePractice(practiceId, updates) {
       return practice;
 
   } catch (error) {
-
       console.error('Error updating practice:', error.message || error);
       throw error;
-
   }
 }
 
@@ -112,6 +129,36 @@ async function getPracticeDetails(userId, practiceId) {
  * @param {Object} newPractice 新的練習資料
  * @returns {Object} 新增的練習物件
  */
+// async function createPractice(userId, newPractice) {
+//   try {
+//     const user = await User.findById(userId);
+//     if (!user) {
+//       throw new Error('使用者不存在');
+//     }
+
+//     const practice = {
+//       _id: new mongoose.Types.ObjectId(),
+//       createdAt: new Date(),
+//       technique: newPractice.technique || '未指定技巧',
+//       difficulty: newPractice.difficulty || '簡單',
+//       history: [],
+//       recordings: [],
+//       analysis: ''
+//     };
+
+//     user.practices.push(practice);
+//     await user.save();
+
+//     // 返回完整的練習對象（包含 _id）
+//     return practice;  // 轉換為普通對象
+
+//   } catch (error) {
+//     console.error('Error creating practice:', error);
+//     throw error;
+//   }
+// }
+
+//0304修改
 async function createPractice(userId, newPractice) {
   try {
     const user = await User.findById(userId);
@@ -124,17 +171,19 @@ async function createPractice(userId, newPractice) {
       createdAt: new Date(),
       technique: newPractice.technique || '未指定技巧',
       difficulty: newPractice.difficulty || '簡單',
+      scenario: newPractice.scenario || '',  // 保存情境內容
       history: [],
       recordings: [],
-      analysis: ''
+      analysis: '',
+      isRetry: newPractice.isRetry || false,
+      originalPracticeId: newPractice.originalPracticeId || null
     };
 
     user.practices.push(practice);
     await user.save();
 
     // 返回完整的練習對象（包含 _id）
-    return practice;  // 轉換為普通對象
-
+    return practice;
   } catch (error) {
     console.error('Error creating practice:', error);
     throw error;
@@ -169,10 +218,40 @@ async function deletePractice(userId, practiceId) {
   }
 }
 
+// 添加一個新函數來獲取練習和其相關的重新練習記錄
+async function getPracticeWithRetries(userId, practiceId) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('使用者不存在');
+    }
+
+    // 獲取原始練習
+    const originalPractice = user.practices.id(practiceId);
+    if (!originalPractice) {
+      throw new Error('練習不存在');
+    }
+
+    // 查找所有與此練習相關的重試記錄
+    const retryPractices = user.practices.filter(p => 
+      p.originalPracticeId && p.originalPracticeId.toString() === practiceId
+    );
+
+    return {
+      originalPractice,
+      retryPractices
+    };
+  } catch (error) {
+    console.error('Error fetching practice with retries:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   updatePractice,
   getPractices,
   getPracticeDetails,
   createPractice,
-  deletePractice
+  deletePractice,
+  getPracticeWithRetries
 };

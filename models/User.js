@@ -75,6 +75,18 @@ const UserSchema = new mongoose.Schema({
       },
 
       difficulty: { type: String, enum: ['簡單', '挑戰'], default: '簡單' },
+
+      isRetry: {
+        type: Boolean,
+        default: false
+      },
+
+      originalPracticeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Practice',
+        default: null
+      },
+      
       feedback: [
         {
           userId: {

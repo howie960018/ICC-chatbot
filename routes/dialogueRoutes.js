@@ -10,10 +10,9 @@ const { analyzeDialogue } = require('../services/analysisService');
 const { updatePractice } = require('../services/practiceService'); // 匯入練習服務模組
 const { resetDialogueState, updateDialogueState, getDialogueState } = require('../services/dialogueService'); // 匯入對話狀態管理
 const { generateChatResponse } = require('../services/openaiService'); // 匯入 OpenAI API 工具
-
 router.post('/start-dialogue', async (req, res) => {
     try {
-        const { technique, practiceId, difficulty } = req.body;
+        const { technique, practiceId, difficulty, specifiedScenario } = req.body;
   
         // 檢查必要參數
         if (!technique || !practiceId || !difficulty) {
@@ -36,12 +35,18 @@ router.post('/start-dialogue', async (req, res) => {
         // 隨機選擇家長個性
         const selectedPersonality = parentPersonalities[Math.floor(Math.random() * parentPersonalities.length)];
   
-        // 隨機選擇情境
-        const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-        console.log('Selected scenario:', randomScenario);
-  
+        // 使用指定的情境或隨機選擇情境
+        let selectedScenario;
+        if (specifiedScenario) {
+            console.log('Using specified scenario:', specifiedScenario);
+            selectedScenario = specifiedScenario;
+        } else {
+            selectedScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+            console.log('Selected random scenario:', selectedScenario);
+        }
+
         // 生成初始消息
-        const initialMessage = createInitialMessage(randomScenario, selectedPersonality);
+        const initialMessage = createInitialMessage(selectedScenario, selectedPersonality);
         console.log('Initial message created:', initialMessage);
   
         // 與 OpenAI API 交互
@@ -93,7 +98,7 @@ router.post('/start-dialogue', async (req, res) => {
             details: error.stack
         });
     }
-  });
+});
   
 
 
@@ -158,6 +163,79 @@ function parseInitialResponse(response) {
   }
 
 
+// router.post('/continue-dialogue', async (req, res) => {
+//     try {
+//         const { userResponse, practiceId, challengeTimeOver } = req.body;
+//         console.log("收到請求：", req.body);
+
+//         if (!practiceId) {
+//             throw new Error('練習 ID 缺失');
+//         }
+
+//         const dialogueState = getDialogueState();
+//         if (!dialogueState || !Array.isArray(dialogueState.history)) {
+//             throw new Error('對話狀態丟失或無效');
+//         }
+
+//         // 如果挑戰模式的倒計時結束，直接執行分析
+//         if (dialogueState.challengeMode && challengeTimeOver) {
+//             const analysis = await analyzeDialogue(practiceId);
+//             await updatePractice(practiceId, {
+//                 history: dialogueState.history,
+//                 analysis
+//             });
+//             return res.json({ completed: true, analysis });
+//         }
+
+//         // 添加導師的回應到對話歷史
+//         addToHistory({ role: "導師", content: userResponse });
+//         incrementCount();
+
+//         if (!dialogueState.challengeMode && dialogueState.count >= 12) {
+//             const analysis = await analyzeDialogue(practiceId);
+//             await updatePractice(practiceId, {
+//                 history: dialogueState.history,
+//                 analysis
+//             });
+//             return res.json({ completed: true, analysis });
+//         }
+
+//         const systemMessage = `請用繁體中文根據老師上一句的回應回覆，如果您對老師回復不滿意，可以更生氣或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。`;
+
+//         const messages = [
+//             { role: "system", content: systemMessage },
+//             ...dialogueState.history.map(entry => ({
+//                 role: entry.role === "家長" ? "assistant" : "user",
+//                 content: entry.content
+//             }))
+//         ];
+
+//         const aiResponse = await generateChatResponse(messages);
+//         if (!aiResponse) {
+//             throw new Error('AI 回應為空');
+//         }
+
+//         addToHistory({ role: "家長", content: aiResponse });
+//         incrementCount();
+
+//         res.json({ 
+//             success: true,
+//             response: aiResponse 
+//         });
+
+//     } catch (error) {
+//         console.error('Error in continue-dialogue:', error);
+//         res.status(500).json({ 
+//             success: false, 
+//             error: error.message || '處理對話時發生錯誤'
+//         });
+//     }
+// });
+
+
+// 0301更新
+
+// 更新 continue-dialogue 路由，確保在對話完成時更新分析結果
 router.post('/continue-dialogue', async (req, res) => {
     try {
         const { userResponse, practiceId, challengeTimeOver } = req.body;
@@ -175,24 +253,43 @@ router.post('/continue-dialogue', async (req, res) => {
         // 如果挑戰模式的倒計時結束，直接執行分析
         if (dialogueState.challengeMode && challengeTimeOver) {
             const analysis = await analyzeDialogue(practiceId);
+            
+            // 保存對話完成狀態和分析結果到練習紀錄
             await updatePractice(practiceId, {
-                history: dialogueState.history,
-                analysis
+                history: dialogueState.history, // 直接覆蓋歷史記錄
+                analysis,
+                completed: true
             });
-            return res.json({ completed: true, analysis });
+            
+            return res.json({ 
+                completed: true, 
+                analysis,
+                practiceId
+            });
         }
 
         // 添加導師的回應到對話歷史
-        addToHistory({ role: "導師", content: userResponse });
-        incrementCount();
+        if (userResponse && userResponse.trim()) {
+            addToHistory({ role: "導師", content: userResponse });
+            incrementCount();
+        }
 
+        // 檢查是否達到簡單模式下的對話次數限制
         if (!dialogueState.challengeMode && dialogueState.count >= 12) {
             const analysis = await analyzeDialogue(practiceId);
+            
+            // 保存對話完成狀態和分析結果到練習紀錄
             await updatePractice(practiceId, {
-                history: dialogueState.history,
-                analysis
+                history: dialogueState.history, // 直接覆蓋歷史記錄
+                analysis,
+                completed: true
             });
-            return res.json({ completed: true, analysis });
+            
+            return res.json({ 
+                completed: true, 
+                analysis,
+                practiceId
+            });
         }
 
         const systemMessage = `請用繁體中文根據老師上一句的回應回覆，如果您對老師回復不滿意，可以更生氣或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。`;
@@ -213,9 +310,24 @@ router.post('/continue-dialogue', async (req, res) => {
         addToHistory({ role: "家長", content: aiResponse });
         incrementCount();
 
+        // 保存當前對話歷史到練習紀錄（不標記為已完成）
+        // 優化：每次只傳入最新的兩條記錄 (老師的回應和AI的回應)
+        // const latestMessages = dialogueState.history.slice(-2);
+        // await updatePractice(practiceId, { 
+        //     history: latestMessages,
+        //     completed: false
+        // });
+        
+        // 因為我們修改了updatePractice方法，可以直接傳入完整歷史
+        await updatePractice(practiceId, { 
+            history: dialogueState.history, // 直接覆蓋歷史記錄
+            completed: false
+        });
+
         res.json({ 
             success: true,
-            response: aiResponse 
+            response: aiResponse,
+            practiceId
         });
 
     } catch (error) {
@@ -226,6 +338,5 @@ router.post('/continue-dialogue', async (req, res) => {
         });
     }
 });
-
  
 module.exports = router;

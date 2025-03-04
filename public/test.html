@@ -74,8 +74,26 @@
                     <button onclick="selectPracticeByTechnique('綜合溝通技巧')">綜合溝通技巧</button>
                 </div>
 
-                <div class="recordings-title">練習紀錄</div>
+                <div class="recordings-title">
+                    已完成練習紀錄
+                    <span class="recordings-count" id="practicesCount"></span>
+                </div>
                 <ul id="practiceList"></ul>
+
+                <!--0301更新 空練習提示 -->
+                <div id="emptyPracticesGuide" class="empty-practices-message" style="display: none;">
+                    <p><strong>還沒有完成的練習</strong></p>
+                    <div class="guide-step">
+                        <span class="guide-step-number">1</span>選擇技巧與模式
+                    </div>
+                    <div class="guide-step">
+                        <span class="guide-step-number">2</span>點擊"開始練習"
+                    </div>
+                    <div class="guide-step">
+                        <span class="guide-step-number">3</span>完成對話練習
+                    </div>
+                    <p>完成練習並獲得分析評分後，才會顯示在此處</p>
+                </div>
             </div>
 
             <div class="main-section">
