@@ -11,6 +11,177 @@ const practiceSelect = document.getElementById('select-btn');
 const difficultySelect = document.getElementById('difficultySelect'); 
 
 
+// main.js - 錄音時間限制與進度顯示功能
+
+// 全局變數
+let recordingTimer = null; // 用於跟踪錄音時間的計時器
+const MAX_RECORDING_TIME = 120;  // 最大錄音時間（秒）
+let recordingProgress = 0; // 錄音進度（0-100）
+let isRecordingTimeDisplay = false; // 是否顯示倒計時
+
+// 新增進度條和倒計時元素到DOM
+function addRecordingProgressElements() {
+  // 檢查是否已經存在進度條元素
+  if (document.getElementById('recordingProgressContainer')) {
+    return;
+  }
+
+  // 創建進度條容器
+  const progressContainer = document.createElement('div');
+  progressContainer.id = 'recordingProgressContainer';
+  progressContainer.className = 'recording-progress-container';
+  progressContainer.style.display = 'none';
+  
+  // 創建進度條
+  const progressBar = document.createElement('div');
+  progressBar.id = 'recordingProgressBar';
+  progressBar.className = 'recording-progress-bar';
+  
+  // 創建倒計時顯示
+  const timerDisplay = document.createElement('div');
+  timerDisplay.id = 'recordingTimerDisplay';
+  timerDisplay.className = 'recording-timer-display';
+  timerDisplay.textContent = `00:${MAX_RECORDING_TIME}`;
+  
+  // 組合元素
+  progressContainer.appendChild(progressBar);
+  progressContainer.appendChild(timerDisplay);
+  
+  // 將進度條添加到錄音控制區域之後
+  const recordControls = document.querySelector('.record-controls');
+  if (recordControls) {
+    recordControls.parentNode.insertBefore(progressContainer, recordControls.nextSibling);
+  } else {
+    // 如果找不到錄音控制區域，則添加到狀態顯示區域之前
+    const statusElement = document.getElementById('recordStatus');
+    if (statusElement) {
+      statusElement.parentNode.insertBefore(progressContainer, statusElement);
+    }
+  }
+  // 添加樣式
+  const style = document.createElement('style');
+  style.textContent = `
+    .recording-progress-container {
+      margin: 15px 0;
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 5px;
+      position: relative;
+      height: 30px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .recording-progress-bar {
+      height: 100%;
+      background-color: #e93ae1;
+      border-radius: 7px;
+      transition: width 0.3s ease;
+      width: 0%;
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    
+    .recording-timer-display {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-weight: bold;
+      color: black;
+      z-index: 10;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    
+    .recording-active {
+      animation: pulse 1.5s infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// 開始錄音計時器和進度顯示
+function startRecordingTimer() {
+    // 重設進度和時間
+    recordingProgress = 0;
+    let remainingTime = MAX_RECORDING_TIME;
+    
+    // 顯示進度條容器
+    const progressContainer = document.getElementById('recordingProgressContainer');
+    const progressBar = document.getElementById('recordingProgressBar');
+    const timerDisplay = document.getElementById('recordingTimerDisplay');
+    
+    if (progressContainer && progressBar && timerDisplay) {
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressBar.classList.add('recording-active');
+      timerDisplay.textContent = formatTime(remainingTime);
+    }
+    
+    // 啟動計時器
+    recordingTimer = setInterval(() => {
+      remainingTime -= 1;
+      recordingProgress = ((MAX_RECORDING_TIME - remainingTime) / MAX_RECORDING_TIME) * 100;
+      
+      // 更新進度條和倒計時
+      if (progressBar) {
+        progressBar.style.width = `${recordingProgress}%`;
+      }
+      
+      if (timerDisplay) {
+        timerDisplay.textContent = formatTime(remainingTime);
+        
+        // 當倒計時小於10秒時，改變顏色提醒用戶
+        if (remainingTime <= 10) {
+          timerDisplay.style.color = 'red';
+        } else {
+          timerDisplay.style.color = 'black';
+        }
+      }
+      
+      // 如果錄音時間達到最大限制，自動停止錄音
+      if (remainingTime <= 0) {
+        if (mediaRecorder && isRecording) {
+          stopRecordBtn.click(); // 自動點擊停止按鈕
+        }
+        clearInterval(recordingTimer);
+        recordingTimer = null;
+      }
+    }, 1000);
+  }
+  
+  // 停止錄音計時器和進度顯示
+  function stopRecordingTimer() {
+    if (recordingTimer) {
+      clearInterval(recordingTimer);
+      recordingTimer = null;
+    }
+    
+    // 隱藏進度條
+    const progressContainer = document.getElementById('recordingProgressContainer');
+    const progressBar = document.getElementById('recordingProgressBar');
+    
+    if (progressContainer) {
+      progressContainer.style.display = 'none';
+    }
+    
+    if (progressBar) {
+      progressBar.classList.remove('recording-active');
+    }
+  }
+  
+  // 格式化時間為 MM:SS 格式
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
 
 // 全局變數
 let countdownTimer = null; 
@@ -24,7 +195,7 @@ let submissionTimer = null;
 let currentDialogueRecordings = [];
 let isRecording = false;
 const maxDialogues = 12;
-const MAX_RECORDING_TIME = 120 * 1000; // 最大錄音時間，這裡設定為 120 秒
+// const MAX_RECORDING_TIME = 120 * 1000; // 最大錄音時間，這裡設定為 120 秒
 let currentAccumulatedText = '';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -878,6 +1049,10 @@ startRecordBtn.addEventListener('click', async () => {
     }
 
     try {
+
+        // 確保進度條元素已添加到DOM
+        addRecordingProgressElements();
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
@@ -891,6 +1066,9 @@ startRecordBtn.addEventListener('click', async () => {
                 isRecording = false;
                 startRecordBtn.disabled = false;
                 stopRecordBtn.disabled = true;
+
+                // 停止錄音計時器和進度顯示
+                stopRecordingTimer();
 
                 const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                 recordStatus.textContent = '處理中...請稍候';
@@ -975,7 +1153,10 @@ startRecordBtn.addEventListener('click', async () => {
 
         startRecordBtn.disabled = true;
         stopRecordBtn.disabled = false;
-        recordStatus.textContent = '錄音中...';
+        recordStatus.textContent = '錄音中...（最多 120 秒）';
+
+        // 開始錄音計時器和進度顯示
+        startRecordingTimer();
 
     } catch (err) {
         console.error('麥克風存取錯誤:', err);
@@ -1054,6 +1235,10 @@ stopRecordBtn.addEventListener('click', () => {
             startRecordBtn.disabled = false;
             stopRecordBtn.disabled = true;
             recordStatus.textContent = '停止錄音...';
+
+
+            // 停止錄音計時器和進度顯示
+            stopRecordingTimer();
 
             // 清理挑戰模式的計時器和倒計時
             if (recordingTimer) {
