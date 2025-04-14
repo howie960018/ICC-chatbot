@@ -3,6 +3,10 @@ const config = require('../config/config');
 const AWS = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
+const OpenCC = require('opencc-js');
+
+// 建立簡體轉繁體轉換器
+const converter = OpenCC.Converter({ from: 'cn', to: 'tw' });
 
 const openai = new OpenAI({
   apiKey: config.openaiApiKey,
@@ -21,8 +25,8 @@ async function transcribeAudio(fileUrl) {
     
     // 從 URL 獲取 bucket 和 key
     const urlParts = new URL(fileUrl);
-    const key = urlParts.pathname.substring(1); // 移除開頭的 '/'
-    const bucket = urlParts.hostname.split('.')[0]; // 獲取 bucket 名稱
+    const key = urlParts.pathname.substring(1);
+    const bucket = urlParts.hostname.split('.')[0];
 
     // 創建臨時目錄（如果不存在）
     const tempDir = path.join(process.cwd(), 'temp');
@@ -57,24 +61,18 @@ async function transcribeAudio(fileUrl) {
     // 刪除臨時文件
     fs.unlinkSync(tempFilePath);
 
-    console.log('轉錄成功:', transcription.text);
-    return transcription.text;
+    // 將轉錄文字轉換為繁體中文
+    const traditionalText = converter(transcription.text);
+    console.log('原始轉錄文字:', transcription.text);
+    console.log('轉換後繁體文字:', traditionalText);
+
+    return traditionalText;
 
   } catch (error) {
-    console.error('音頻處理錯誤:', error);
-    
-    // 提供更詳細的錯誤信息
-    if (error.code === 'NoSuchKey') {
-      throw new Error('找不到指定的音頻文件');
-    } else if (error.code === 'AccessDenied') {
-      throw new Error('無權訪問音頻文件，請檢查 S3 權限設定');
-    } else {
-      throw new Error('轉錄失敗：' + (error.message || '未知錯誤'));
-    }
+    console.error('音頻轉錄失敗:', error);
+    throw error;
   }
 }
-
-
 
 async function generateChatResponse(messages) {
   try {
@@ -103,5 +101,21 @@ async function generateChatResponse(messages) {
 
 module.exports = {
   transcribeAudio,
-  generateChatResponse
+  generateChatResponse: async (messages) => {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1000
+      });
+
+      // 確保回應也轉換為繁體中文
+      const response = completion.choices[0].message.content;
+      return converter(response);
+    } catch (error) {
+      console.error('生成回應失敗:', error);
+      throw error;
+    }
+  }
 };

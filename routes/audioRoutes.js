@@ -4,6 +4,10 @@ const multer = require('multer');
 const AWS = require('aws-sdk');
 const User = require('../models/User');
 const { transcribeAudio } = require('../services/openaiService');
+const OpenCC = require('opencc-js');
+
+// 建立簡體轉繁體轉換器
+const converter = OpenCC.Converter({ from: 'cn', to: 'tw' });
 
 // AWS S3 配置
 const s3 = new AWS.S3({
@@ -60,17 +64,17 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
     // 驗證請求
     const validationErrors = validateRequest(req);
     if (validationErrors.length > 0) {
-      throw new Error(validationErrors.join(', '));
+      throw new Error(validationErrors.map(err => converter(err)).join(', '));
     }
 
     // 生成檔案名稱
     const fileName = `recording-${Date.now()}.wav`;
 
-    // 上傳到 S3，正確傳入參數
+    // 上傳到 S3
     const s3Result = await uploadToS3(req.file, fileName);
     console.log('S3 上傳成功:', s3Result.Location);
 
-    // 轉錄音頻
+    // 轉錄音頻（已包含簡繁轉換）
     const transcription = await transcribeAudio(s3Result.Location);
     console.log('轉錄完成:', transcription);
 
@@ -84,12 +88,12 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
     // 更新用戶練習記錄
     const user = await User.findOne({ 'practices._id': req.body.practiceId });
     if (!user) {
-      throw new Error('練習記錄未找到');
+      throw new Error(converter('練習記錄未找到'));
     }
 
     const practice = user.practices.id(req.body.practiceId);
     if (!practice) {
-      throw new Error('練習記錄未找到');
+      throw new Error(converter('練習記錄未找到'));
     }
 
     // 避免重複儲存
@@ -110,7 +114,7 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
     console.error('音頻處理失敗:', error);
     res.status(500).json({
       success: false,
-      error: error.message || '音頻處理失敗'
+      error: converter(error.message || '音頻處理失敗')
     });
   }
 });

@@ -500,7 +500,10 @@ async function retryPractice(practiceId, scenario) {
         // 開始新的對話練習，傳遞原始情境
         await startDialogue(data.practice._id, data.practice.scenario);
         
-        // 提示用户
+        // 更新練習列表
+        await loadPractices();
+        
+        // 提示用戶
         alert('已創建重新練習！');
       } else {
         throw new Error(data.message || '創建重新練習失敗');
@@ -509,7 +512,7 @@ async function retryPractice(practiceId, scenario) {
       console.error('重新練習失敗:', error);
       alert('重新練習失敗: ' + error.message);
     }
-  }
+}
 
 // async function loadPractices() {
 //     const token = localStorage.getItem('token'); // 從 LocalStorage 獲取 Token
@@ -722,7 +725,7 @@ async function loadPractices() {
                 { value: 'all', text: '所有日期' },
                 { value: 'today', text: '今天' },
                 { value: 'week', text: '本週' },
-                { value: 'month', text: '本月' }
+                { value: '7days', text: '超過7天' }
             ];
             
             dateOptions.forEach(option => {
@@ -878,8 +881,10 @@ function filterPractices() {
                 passDateFilter = isSameDay(practiceDate, today);
             } else if (dateFilter === 'week') {
                 passDateFilter = isThisWeek(practiceDate, today);
-            } else if (dateFilter === 'month') {
-                passDateFilter = isSameMonth(practiceDate, today);
+            } else if (dateFilter === '7days') {
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setUTCDate(today.getUTCDate() - 7);
+                return practiceDate < sevenDaysAgo;
             }
         }
         
@@ -936,9 +941,11 @@ function isThisWeek(date, today) {
     const firstDayOfWeek = new Date(today);
     const day = today.getDay() || 7; // 若 today 是周日，getDay() 會返回 0
     firstDayOfWeek.setDate(today.getDate() - day + 1); // 設置為本週一
+    firstDayOfWeek.setHours(0, 0, 0, 0); // 設置為當天開始時間
     
     const lastDayOfWeek = new Date(firstDayOfWeek);
     lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6); // 設置為本週日
+    lastDayOfWeek.setHours(23, 59, 59, 999); // 設置為當天結束時間
     
     return date >= firstDayOfWeek && date <= lastDayOfWeek;
 }
@@ -1099,8 +1106,15 @@ startRecordBtn.addEventListener('click', async () => {
                     throw new Error(data.error);
                 }
 
-                const transcribedText = data.text;
-                console.log('轉錄文字:', transcribedText);
+                // 在這裡加入簡體轉繁體的處理
+                let transcribedText = data.text;
+                try {
+                    transcribedText = await convertToTraditional(data.text);
+                    console.log('轉換後的繁體文字:', transcribedText);
+                } catch (conversionError) {
+                    console.error('簡體轉繁體失敗:', conversionError);
+                    // 如果轉換失敗，仍使用原始文字
+                }
 
                 currentAccumulatedText = `${currentAccumulatedText.trim()} ${transcribedText}`.trim();
                 updateTranscriptionPreview(currentAccumulatedText);
@@ -2088,4 +2102,26 @@ document.getElementById('submitFeedbackBtn').addEventListener('click', async () 
         console.error('載入心得失敗:', error);
         feedbackList.innerHTML = '<p class="no-feedback">載入失敗，請稍後重試。</p>';
     }
+}
+
+// 新增簡體轉繁體的函數
+function convertToTraditional(text) {
+    // 使用 OpenCC 的 API 進行轉換
+    return fetch('https://api.zhconvert.org/convert', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            text: text,
+            converter: 'China-to-Taiwan' // 簡體轉繁體
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            return data.text;
+        }
+        throw new Error('轉換失敗');
+    });
 }

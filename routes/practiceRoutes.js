@@ -68,9 +68,10 @@ router.get('/practices', async (req, res) => {
             const day = today.getDay() || 7;
             firstDayOfWeek.setUTCDate(today.getUTCDate() - day + 1);
             return practiceDate >= firstDayOfWeek;
-          } else if (dateRange === 'month') {
-            const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            return practiceDate >= firstDayOfMonth;
+          } else if (dateRange === '7days') {
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setUTCDate(today.getUTCDate() - 7);
+            return practiceDate < sevenDaysAgo;
           }
           return true;
         });
