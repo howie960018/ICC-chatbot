@@ -124,6 +124,30 @@
                 min-width: unset;
             }
         }
+
+        .technique-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .technique-link {
+            display: block;
+            padding: 10px 15px;
+            background-color: #f5f5f5;
+            color: #333;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .technique-link:hover {
+            background-color: #e93ae1;
+            color: white;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -147,13 +171,13 @@
                 <div class="recordings-title">溝通技巧介紹</div>
                 <!-- 新增顯示區域 -->
                 <div class="technique-options">
-                    <button onclick="selectPracticeByTechnique('我訊息')">我訊息</button>
-                    <button onclick="selectPracticeByTechnique('三明治溝通法')">三明治溝通法</button>
-                    <button onclick="selectPracticeByTechnique('綜合溝通技巧')">綜合溝通技巧</button>
+                    <a href="/i-message.html" class="technique-link">我訊息</a>
+                    <a href="/sandwich.html" class="technique-link">三明治溝通法</a>
+                    <a href="/comprehensive.html" class="technique-link">綜合溝通技巧</a>
                 </div>
 
                 <div class="recordings-title">
-                    已完成紀錄
+                    練習紀錄
                     <span class="recordings-count" id="practicesCount"></span>
                 </div>
                 <ul id="practiceList"></ul>
@@ -219,9 +243,9 @@
                 <div id="recordingsList"></div>
 
                 <div class="feedback-section">
-                    <h4>📝 學習紀錄</h4>
+                    <h4>📝 學習省思紀錄</h4>
                     <div id="feedbackList" class="feedback-list">
-                        <p class="no-feedback">目前尚無學習紀錄。</p>
+                        <p class="no-feedback">目前尚無學習省思紀錄。</p>
                     </div>
                     <textarea id="feedbackInput" class="feedback-input" placeholder="本次練習做得好的地方、可以改進的地方或其他..."></textarea>
                     <button id="submitFeedbackBtn" class="feedback-btn">提交紀錄</button>
