@@ -1056,7 +1056,6 @@ startRecordBtn.addEventListener('click', async () => {
     }
 
     try {
-
         // 確保進度條元素已添加到DOM
         addRecordingProgressElements();
 
@@ -1067,6 +1066,12 @@ startRecordBtn.addEventListener('click', async () => {
         mediaRecorder.ondataavailable = (event) => {
             audioChunks.push(event.data);
         };
+
+        // 如果是挑戰模式且倒計時尚未開始，則開始倒計時
+        const difficulty = difficultySelect.value;
+        if (difficulty === '挑戰' && !challengeTimer) {
+            startCountdown();
+        }
 
         mediaRecorder.onstop = async () => {
             try {
@@ -1179,21 +1184,35 @@ startRecordBtn.addEventListener('click', async () => {
 });
 
 
-// 溝通技巧的簡短介紹
 const techniqueIntroductions = {
     "我訊息": `
         <h3>我訊息</h3>
-        <p>我訊息是一種強調自己感受和觀點的溝通技巧，透過清楚描述問題、表達感受和提出期待，減少指責對方的可能性。例如：「當你遲到時，我感到很擔心，因為我希望我們可以按時完成計劃。」</p>
+        <p>
+            1. 具體描述對方行為：<br>
+            2. 說出自己主觀感受：<br>
+            3. 表達自己觀點立場：<br>
+            4. 提出未來改善作法：<br>
+        </p>
     `,
     "三明治溝通法": `
         <h3>三明治溝通法</h3>
-        <p>三明治溝通法通過「正面肯定 - 建設性回饋 - 正面鼓勵」的方式表達意見，減少對方的抗拒心理。例如：「你最近表現很棒，我想我們可以一起改進報告的格式，這樣會更完美，你有這樣的潛力！」</p>
+        <p>
+            1. 第一層麵包（正向回饋）：<br>
+            2. 夾心部分（建設性批評或回饋）：<br>
+            3. 第二層麵包（再度正向回饋）：<br>
+        </p>
     `,
     "綜合溝通技巧": `
         <h3>綜合溝通技巧</h3>
-        <p>綜合溝通技巧包含積極傾聽、同理心、清晰表達、雙向溝通和解決問題導向，幫助建立信任和有效合作。例如：「我理解你的感受，我們一起來想想有什麼解決方案。」</p>
+        <p>
+            1. 情感表現：主動釋出善意，明顯展現理解與同理，語氣溫和尊重，親師關係正向發展。<br>
+            2. 內容回應：回應聚焦問題核心，根據家長語意做出恰當補充與引導建立共識，展現高度情境掌握力。<br>
+            3. 清晰表達：語言表達自然順暢，用詞精準恰當，結構明確，易於理解與建立信任。<br>
+            4. 溝通技巧：恰當運用「我訊息」、「三明治溝通法」或其他正向溝通技巧，結構自然、效果良好。如無需使用技巧，語氣結構仍具高度專業。<br>
+        </p>
     `
 };
+
 
 // 處理點擊溝通技巧按鈕的邏輯
 function selectPracticeByTechnique(technique) {
@@ -1548,10 +1567,9 @@ async function startDialogue(practiceId, specifiedScenario = null) {
             technique,
             difficulty,
             practiceId,
-            specifiedScenario  // 關鍵: 傳遞指定情境
+            specifiedScenario
         }); 
 
-        // 檢查是否已經有練習記錄
         const response = await fetch('/api/dialogue/start-dialogue', {
             method: 'POST',
             headers: {
@@ -1562,16 +1580,27 @@ async function startDialogue(practiceId, specifiedScenario = null) {
                 technique,
                 difficulty,
                 practiceId,
-                specifiedScenario  // 關鍵: 傳遞指定情境
+                specifiedScenario
             }),
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || '開始對話失敗');
+            let errorMessage = '開始對話失敗';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+                console.error('API 錯誤詳情:', errorData);
+            } catch (e) {
+                console.error('解析錯誤回應失敗:', e);
+            }
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.message || 'API 回應失敗');
+        }
         
         scenarioDisplay.innerHTML = `
             <div class="message-header">📝 情境</div>
@@ -1590,22 +1619,17 @@ async function startDialogue(practiceId, specifiedScenario = null) {
             </div>
         `;
 
-        // 啟動挑戰模式倒計時
-        if (difficulty === '挑戰') {
-            startCountdown();
-        }
-
     } catch (error) {
         console.error('開始對話失敗:', error);
-        alert(error.message);
+        const errorMessage = error.message || '發生未知錯誤';
+        alert(`錯誤：${errorMessage}`);
         scenarioDisplay.innerHTML = `
             <div class="message error">
                 <div class="message-header">❌ 錯誤</div>
-                <div class="message-content">${error.message}</div>
+                <div class="message-content">${errorMessage}</div>
             </div>
         `;
     } finally {
-        // 隱藏 loading spinner
         spinner.classList.remove('spinner-visible');
     }
 }

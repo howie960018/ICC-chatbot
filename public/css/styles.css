@@ -943,3 +943,171 @@ audio {
         max-width: 100%;
     }
 }
+
+/* 更新容器佈局 */
+.container {
+    display: flex;
+    gap: 15px; /* 減少間距 */
+    max-width: 1500px; /* 增加最大寬度 */
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 更新主要內容區域 */
+.main-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1000px; /* 增加最大寬度 */
+    min-width: 600px; /* 設定最小寬度 */
+    margin: 0 auto; /* 居中 */
+}
+
+/* 減少側邊欄寬度 */
+#practiceSidebar {
+    width: 15%; /* 減少寬度 */
+    max-width: 200px; /* 減少最大寬度 */
+    min-width: 150px; /* 減少最小寬度 */
+    overflow-y: auto;
+    border-right: 1px solid #ddd;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+/* 錄音列表側邊欄 */
+.recordings-sidebar {
+    width: 15%; /* 減少寬度與左側一致 */
+    max-width: 200px; /* 減少最大寬度 */
+    min-width: 150px; /* 減少最小寬度 */
+    overflow-y: auto;
+    padding: 10px;
+    border-left: 1px solid #ddd;
+    box-sizing: border-box;
+}
+
+/* 優化對話顯示區域 */
+#dialogueDisplay {
+    background-color: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+    width: 100%; /* 確保寬度充分利用 */
+}
+
+/* 增強響應式設計 */
+@media (max-width: 1200px) {
+    .container {
+        flex-direction: column;
+    }
+    
+    #practiceSidebar, .recordings-sidebar {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: 300px;
+        position: static;
+    }
+    
+    .main-section {
+        max-width: 100%;
+        min-width: unset;
+    }
+}
+
+/* 中等屏幕適配 */
+@media (min-width: 1201px) and (max-width: 1400px) {
+    #practiceSidebar, .recordings-sidebar {
+        width: 12%;
+        min-width: 120px;
+    }
+    
+    .main-section {
+        max-width: 76%;
+    }
+}
+
+/* 針對面板內容的優化 */
+.panel {
+    width: 100%;
+    box-sizing: border-box;
+}
+/* 調整錄音列表容器的大小 */
+#recordingsList {
+    max-height: 250px; /* 根據實際需要調整高度 */
+    overflow-y: auto;
+    margin-bottom: 10px; /* 縮小底部間距 */
+  }
+  
+  /* 讓學習紀錄直接跟在錄音歷史下方 */
+  .recordings-sidebar .feedback-section {
+    margin-top: 10px; /* 減少上方間距 */
+    border-top: 1px solid #eee; /* 可選：添加分隔線 */
+    padding-top: 10px;
+  }
+  
+  /* 調整錄音歷史標題底部間距 */
+  .recordings-title {
+    margin-bottom: 10px; /* 減小間距 */
+  }
+
+  /* 調整容器最大寬度 */
+.container {
+    max-width: 95%; /* 將整體容器擴展到視窗寬度的95% */
+    width: 95%;
+    margin: 0 auto;
+  }
+  
+  /* 調整左側欄寬度 */
+  #practiceSidebar {
+    width: 20%; /* 從15%增加到20% */
+    max-width: 280px; /* 增加最大寬度 */
+    min-width: 200px; /* 增加最小寬度 */
+  }
+  
+  /* 調整右側欄寬度 */
+  .recordings-sidebar {
+    width: 20%; /* 從15%增加到20% */
+    max-width: 280px; /* 增加最大寬度 */
+    min-width: 200px; /* 增加最小寬度 */
+  }
+  
+  /* 確保中間區域佔用相應空間 */
+  .main-section {
+    flex: 1;
+    min-width: 600px; /* 保持不變 */
+    max-width: none; /* 移除最大寬度限制，讓它根據容器和其他元素自動調整 */
+  }
+  
+  /* 對於特寬螢幕，限制中間區域的最大寬度 */
+  @media (min-width: 1800px) {
+    .main-section {
+      max-width: 1200px; /* 在非常寬的螢幕上設置最大寬度 */
+      margin: 0 auto;
+    }
+  }
+
+  /* 強制覆蓋側邊欄寬度 */
+#practiceSidebar.recordings-sidebar,
+.recordings-sidebar {
+  width: 25% !important; /* 從15%增加到20% */
+  max-width: 300px !important; /* 增加最大寬度 */
+  min-width: 200px !important; /* 增加最小寬度 */
+  flex-basis: 20% !important; /* 確保flex佈局也使用相同寬度 */
+}
+
+/* 強制容器使用更大的寬度 */
+.container {
+  max-width: 95% !important;
+  width: 95% !important;
+  margin: 0 auto !important;
+}
+
+/* 確保中間區域適應 */
+.main-section {
+  flex: 1 !important;
+  min-width: 600px !important;
+  max-width: none !important;
+}

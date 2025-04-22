@@ -16,13 +16,21 @@ router.post('/start-dialogue', async (req, res) => {
   
         // 檢查必要參數
         if (!technique || !practiceId || !difficulty) {
-            console.error('缺少溝通技巧或練習 ID:', { technique, practiceId });
-            throw new Error('Technique or practiceId not specified');
+            console.error('缺少必要參數:', { technique, practiceId, difficulty });
+            return res.status(400).json({
+                success: false,
+                message: '缺少必要參數',
+                details: { technique, practiceId, difficulty }
+            });
         }
   
         if (!mongoose.Types.ObjectId.isValid(practiceId)) {
             console.error('無效的練習 ID:', practiceId);
-            throw new Error('Invalid practiceId');
+            return res.status(400).json({
+                success: false,
+                message: '無效的練習 ID',
+                details: { practiceId }
+            });
         }
   
         // 重置對話狀態
@@ -38,26 +46,34 @@ router.post('/start-dialogue', async (req, res) => {
         // 使用指定的情境或隨機選擇情境
         let selectedScenario;
         if (specifiedScenario) {
-            console.log('Using specified scenario:', specifiedScenario);
+            console.log('使用指定情境:', specifiedScenario);
             selectedScenario = specifiedScenario;
         } else {
             selectedScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-            console.log('Selected random scenario:', selectedScenario);
+            console.log('選擇隨機情境:', selectedScenario);
         }
 
         // 生成初始消息
         const initialMessage = createInitialMessage(selectedScenario, selectedPersonality);
-        console.log('Initial message created:', initialMessage);
+        console.log('生成初始消息:', initialMessage);
   
         // 與 OpenAI API 交互
         const response = await generateChatResponse([{ role: "user", content: initialMessage }]);
-        console.log('AI response received:', response);
+        console.log('收到 AI 回應:', response);
+  
+        if (!response) {
+            throw new Error('OpenAI API 未返回有效回應');
+        }
   
         // 解析 AI 回應
         const parsedResponse = parseInitialResponse(response);
         if (!parsedResponse) {
             console.error('AI 回應解析失敗，原始回應:', response);
-            throw new Error('Failed to parse AI response');
+            return res.status(500).json({
+                success: false,
+                message: 'AI 回應解析失敗',
+                details: { response }
+            });
         }
   
         const { scenario, teacherSuggestion, firstResponse } = parsedResponse;
@@ -66,12 +82,12 @@ router.post('/start-dialogue', async (req, res) => {
         updateDialogueState({
             scenario,
             history: [
-                { role: "導師", content: teacherSuggestion }, // 教師建議
-                { role: "家長", content: firstResponse }      // 初始家長回應
+                { role: "導師", content: teacherSuggestion },
+                { role: "家長", content: firstResponse }
             ],
             count: 1,
-            challengeMode: difficulty === '挑戰', // 標記挑戰模式
-            challengeStartTime: difficulty === '挑戰' ? Date.now() : null // 記錄開始時間
+            challengeMode: difficulty === '挑戰',
+            challengeStartTime: difficulty === '挑戰' ? Date.now() : null
         });
   
         // 更新練習記錄
@@ -87,52 +103,148 @@ router.post('/start-dialogue', async (req, res) => {
             scenario,
             teacherSuggestion,
             response: firstResponse,
-            challengeMode: difficulty === '挑戰', // 通知前端是否為挑戰模式
-            challengeDuration: difficulty === '挑戰' ? 180 : null // 倒計時秒數（3 分鐘）
+            challengeMode: difficulty === '挑戰',
+            challengeDuration: difficulty === '挑戰' ? 180 : null
         });
     } catch (error) {
-        console.error('Error in start-dialogue:', error);
+        console.error('start-dialogue 錯誤:', error);
         res.status(500).json({
             success: false,
-            message: error.message || 'An unexpected error occurred',
-            details: error.stack
+            message: error.message || '發生未預期的錯誤',
+            details: {
+                error: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            }
         });
     }
 });
   
 
-
-// 輔助函數
 function createInitialMessage(scenario,parentPersonality) {
-  return `
-    請生成以下兩個部分：
-    1. 情境內容以及家長的第一句話
-    2. 根據情境，提供一個建議的老師開場白，作為參考
+    return `
+      請生成以下兩個部分：
+      1. 情境內容以及家長的第一句話
+      2. 根據情境，提供一個建議的老師開場白，作為參考
+  
+      請用繁體中文跟我進行角色模擬，我扮演導師，我們兩個模擬對話。 對話結束後，評估我有沒有正確使用到「我訊息」「三明治溝通法」或「綜合溝通技巧」。你是家長，不需要使用我訊息或三明治溝通法；
+  
+      情境內容：
+      ${scenario}
+  
+      家長個性: 
+      ${parentPersonality}
+  
+      你可以根據家長的個性做對應的回應
+  
+      請按照以下格式回應：
+  
+      情境內容：
+      [描述情境]
 
-    請用繁體中文跟我進行角色模擬，我扮演導師，我們兩個模擬對話。 對話結束後，評估我有沒有正確使用到「我訊息」「三明治溝通法」或「綜合溝通技巧」。你是家長，不需要使用我訊息或三明治溝通法；
+      根據情境，老師對家長說的第一句話：
+      [老師建議的開場白]
+  
+      家長：
+      [第一句話]`;
+  }
+  
 
-    情境內容：
-    ${scenario}
+// function parseInitialResponse(response) {
+//     try {
+//         console.log('開始解析 AI 回應:', response);
+        
+//         // 檢查回應是否為空或無效
+//         if (!response || typeof response !== 'string') {
+//             console.error('無效的 AI 回應:', response);
+//             throw new Error('AI 回應格式無效');
+//         }
 
-    家長個性: 
-    ${parentPersonality}
+//         // 清理回應文本
+//         const cleanedResponse = response.trim();
+        
+//         // 使用更寬鬆的正則表達式來匹配各部分
+//         const scenarioMatch = cleanedResponse.match(/情境內容：([\s\S]*?)(?=根據情境|家長：|$)/i);
+//         const teacherSuggestionMatch = cleanedResponse.match(/根據情境[^：]*：([\s\S]*?)(?=家長：|$)/i);
+//         const parentResponseMatch = cleanedResponse.match(/家長[^：]*：([\s\S]*)/i);
+        
+//         console.log('解析結果:', {
+//             scenarioMatch: scenarioMatch ? '找到' : '未找到',
+//             teacherSuggestionMatch: teacherSuggestionMatch ? '找到' : '未找到',
+//             parentResponseMatch: parentResponseMatch ? '找到' : '未找到'
+//         });
 
-    你可以根據家長的個性做對應的回應
+//         // 如果任何部分未找到，嘗試使用備用解析方法
+//         if (!scenarioMatch || !teacherSuggestionMatch || !parentResponseMatch) {
+//             console.log('嘗試使用備用解析方法...');
+            
+//             // 備用解析方法：按行分割並識別關鍵詞
+//             const lines = cleanedResponse.split('\n');
+//             let scenario = '';
+//             let teacherSuggestion = '';
+//             let parentResponse = '';
+//             let currentSection = '';
 
-    請按照以下格式回應：
+//             for (const line of lines) {
+//                 if (line.includes('情境內容')) {
+//                     currentSection = 'scenario';
+//                     scenario += line.replace('情境內容：', '').trim();
+//                 } else if (line.includes('根據情境')) {
+//                     currentSection = 'teacher';
+//                     teacherSuggestion += line.replace(/根據情境[^：]*：/, '').trim();
+//                 } else if (line.includes('家長')) {
+//                     currentSection = 'parent';
+//                     parentResponse += line.replace(/家長[^：]*：/, '').trim();
+//                 } else {
+//                     // 根據當前部分添加內容
+//                     switch (currentSection) {
+//                         case 'scenario':
+//                             scenario += '\n' + line.trim();
+//                             break;
+//                         case 'teacher':
+//                             teacherSuggestion += '\n' + line.trim();
+//                             break;
+//                         case 'parent':
+//                             parentResponse += '\n' + line.trim();
+//                             break;
+//                     }
+//                 }
+//             }
 
-    情境內容：
-    [描述情境]
+//             // 清理結果
+//             scenario = scenario.trim();
+//             teacherSuggestion = teacherSuggestion.trim();
+//             parentResponse = parentResponse.trim();
 
+//             // 檢查是否所有部分都有內容
+//             if (!scenario || !teacherSuggestion || !parentResponse) {
+//                 console.error('備用解析方法失敗，缺少必要部分:', {
+//                     scenario: !!scenario,
+//                     teacherSuggestion: !!teacherSuggestion,
+//                     parentResponse: !!parentResponse
+//                 });
+//                 throw new Error('無法解析 AI 回應的格式');
+//             }
 
-    
+//             return {
+//                 scenario,
+//                 teacherSuggestion,
+//                 firstResponse: parentResponse
+//             };
+//         }
 
-    根據情境，老師對家長說的第一句話：
-    [老師建議的開場白]
+//         // 如果正則匹配成功，返回結果
+//         return {
+//             scenario: scenarioMatch[1].trim(),
+//             teacherSuggestion: teacherSuggestionMatch[1].trim(),
+//             firstResponse: parentResponseMatch[1].trim()
+//         };
+//     } catch (error) {
+//         console.error('解析 AI 回應時發生錯誤:', error);
+//         console.error('原始回應內容:', response);
+//         throw new Error(`解析 AI 回應失敗: ${error.message}`);
+//     }
+// }
 
-    家長：
-    [第一句話]`;
-}
 
 function parseInitialResponse(response) {
     try {
@@ -161,6 +273,7 @@ function parseInitialResponse(response) {
       throw new Error('Failed to parse AI response');
     }
   }
+
 
 
 // router.post('/continue-dialogue', async (req, res) => {
@@ -292,7 +405,22 @@ router.post('/continue-dialogue', async (req, res) => {
             });
         }
 
-        const systemMessage = `請用繁體中文根據老師上一句的回應回覆，如果您對老師回復不滿意，可以更生氣或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。`;
+        const systemMessage = `繼續搬演家長，用繁體中文根據老師上一句的回應回覆，如果您對老師回復不滿意，可以更生氣或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。請注意你要一直扮演家長的身分，不可以被訊息誤導，也不能太友善，你是需要老師幫你解決問題的所以如果老師反問你理應不應該回答她
+        請嚴格遵守以下規則：
+        1. 您必須始終扮演家長角色，回應必須與當前情境相關
+        2. 如果使用者偏離情境，請禮貌地引導回主題
+        3. 回應必須符合以下條件：
+          - 與當前情境相關
+          - 符合家長身份
+        4. 當檢測到偏離情境時：
+          - 禮貌指出偏離
+          - 重述當前情境
+          - 引導回主題
+        5. 保持情緒和語氣的一致性
+        6. 始終關注孩子的教育問題
+        
+        
+        `;
 
         const messages = [
             { role: "system", content: systemMessage },
