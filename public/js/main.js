@@ -1625,7 +1625,7 @@ async function startDialogue(practiceId, specifiedScenario = null) {
         alert(`錯誤：${errorMessage}`);
         scenarioDisplay.innerHTML = `
             <div class="message error">
-                <div class="message-header">❌ 錯誤</div>
+                <div class="message-header">❌ 錯誤 請重試</div>
                 <div class="message-content">${errorMessage}</div>
             </div>
         `;
