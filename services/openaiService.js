@@ -4,6 +4,8 @@ const AWS = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
 const OpenCC = require('opencc-js');
+const axios = require('axios');
+
 
 // 建立簡體轉繁體轉換器
 const converter = OpenCC.Converter({ from: 'cn', to: 'tw' });
@@ -74,6 +76,7 @@ async function transcribeAudio(fileUrl) {
   }
 }
 
+
 async function generateChatResponse(messages) {
   try {
       console.log('Sending request to OpenAI:', messages);
@@ -99,8 +102,94 @@ async function generateChatResponse(messages) {
   }
 }
 
+
+
+async function generateSpeech(text, voice = 'shimmer') {
+  try {
+    // 檢查輸入文字
+    if (!text || typeof text !== 'string') {
+      throw new Error('無效的文字輸入');
+    }
+
+    const apiKey = config.openaiApiKey;
+    if (!apiKey) {
+      throw new Error('OpenAI API 金鑰未設定');
+    }
+
+    // 確保臨時目錄存在
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // 生成唯一的檔案名稱
+    const timestamp = Date.now();
+    const outputPath = path.join(tempDir, `speech-${timestamp}.mp3`);
+
+    // 檢查檔案是否已存在
+    if (fs.existsSync(outputPath)) {
+      fs.unlinkSync(outputPath); // 如果存在則刪除
+    }
+
+    const response = await axios({
+      method: 'POST',
+      url: 'https://api.openai.com/v1/audio/speech',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      responseType: 'stream',
+      data: {
+        model: 'tts-1',
+        input: text,
+        voice: voice,
+        response_format: 'mp3'
+      }
+    });
+
+    // 使用 Promise 處理檔案寫入
+    return new Promise((resolve, reject) => {
+      const writer = fs.createWriteStream(outputPath);
+      
+      writer.on('error', (error) => {
+        console.error('寫入音頻檔案失敗:', error);
+        reject(new Error('音頻檔案寫入失敗'));
+      });
+
+      writer.on('finish', () => {
+        console.log('音頻檔案已生成:', outputPath);
+        resolve(outputPath);
+      });
+
+      // 處理串流錯誤
+      response.data.on('error', (error) => {
+        console.error('音頻串流錯誤:', error);
+        writer.end();
+        reject(new Error('音頻串流處理失敗'));
+      });
+
+      // 將回應串流導向檔案
+      response.data.pipe(writer);
+    });
+
+  } catch (error) {
+    console.error('語音合成失敗:', error.response?.data || error.message);
+    // 清理可能的部分檔案
+    if (outputPath && fs.existsSync(outputPath)) {
+      try {
+        fs.unlinkSync(outputPath);
+      } catch (cleanupError) {
+        console.error('清理臨時檔案失敗:', cleanupError);
+      }
+    }
+    throw new Error(error.response?.data?.error?.message || error.message || '語音合成失敗');
+  }
+}
+
+
 module.exports = {
   transcribeAudio,
+  generateSpeech,
   generateChatResponse: async (messages) => {
     try {
       const completion = await openai.chat.completions.create({

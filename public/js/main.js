@@ -8,8 +8,146 @@ const stopRecordBtn = document.getElementById('stopRecordBtn');
 const recordStatus = document.getElementById('recordStatus');
 const analysisContent = document.getElementById('analysisContent');
 const practiceSelect = document.getElementById('select-btn');
-const difficultySelect = document.getElementById('difficultySelect'); 
+const difficultySelect = document.getElementById('difficultySelect');
+const voiceInputControls = document.getElementById('voiceInputControls');
+const textInputControls = document.getElementById('textInputControls');
+const textInput = document.getElementById('textInput');
+const submitTextBtn = document.getElementById('submitTextBtn');
+const inputMethodRadios = document.querySelectorAll('input[name="inputMethod"]');
 
+// 處理輸入方式切換
+inputMethodRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        if (e.target.value === 'voice') {
+            voiceInputControls.style.display = 'block';
+            textInputControls.style.display = 'none';
+            // 如果正在錄音，停止錄音
+            if (isRecording) {
+                stopRecordBtn.click();
+            }
+        } else {
+            voiceInputControls.style.display = 'none';
+            textInputControls.style.display = 'block';
+            // 如果正在錄音，停止錄音
+            if (isRecording) {
+                stopRecordBtn.click();
+            }
+        }
+    });
+});
+
+// 處理文字提交
+submitTextBtn.addEventListener('click', async () => {
+    const text = textInput.value.trim();
+    if (!text) {
+        recordStatus.textContent = '請輸入文字內容';
+        return;
+    }
+
+    if (!currentPracticeId) {
+        recordStatus.textContent = '未選擇練習 ID，請先建立或選擇一個練習';
+        return;
+    }
+
+    try {
+        submitTextBtn.disabled = true;
+        recordStatus.textContent = '處理中...請稍候';
+
+        // 使用與語音輸入相同的處理邏輯
+        await handleSubmission(text);
+        
+        // 清空輸入框
+        textInput.value = '';
+        recordStatus.textContent = '文字已提交';
+    } catch (error) {
+        console.error('文字提交錯誤：', error);
+        recordStatus.textContent = '發生錯誤：' + error.message;
+    } finally {
+        submitTextBtn.disabled = false;
+    }
+});
+
+// 修改原有的 handleSubmission 函數，使其同時支援語音和文字輸入
+async function handleSubmission(text) {
+    try {
+        const difficulty = difficultySelect.value;
+        
+        isWaitingForSubmission = false;
+        clearTranscriptionPreview();
+        
+        recordStatus.textContent = 'AI 分析中...';
+        
+        if (!text || text.trim().length === 0) {
+            throw new Error('提交的文字內容為空');
+        }
+
+        updateDialogueDisplay("老師", text);
+
+        const response = await fetch('/api/dialogue/continue-dialogue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                userResponse: text,
+                practiceId: currentPracticeId,
+                challengeTimeOver: false,
+                inputMethod: document.querySelector('input[name="inputMethod"]:checked').value
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('API 請求失敗');
+        }
+
+        const data = await response.json();
+
+        if (!data) {
+            throw new Error('無效的回應數據');
+        }
+
+        // 檢查回應格式
+        if (difficulty === '簡單') {
+            if (data.completed && data.analysis) {
+                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+                disableUserInput();
+                // 處理對話結束，更新練習列表
+                await handleDialogueEnd(currentPracticeId, data.analysis);
+            } else if (data.response) {
+                // 更新對話顯示，包含音頻檔案路徑
+                updateDialogueDisplay("家長", data.response, data.audioFilePath);
+                // 修改這裡：只有在達到 6 句對話時才顯示結束訊息
+                if (dialogueCount >= 7) {
+                    disableUserInput();
+                    showEndDialogueMessage();
+                } else {
+                    recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+                    enableUserInput();
+                }
+            }
+        } else if (difficulty === '挑戰') {
+            if (data.completed && data.analysis) {
+                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+                disableUserInput();
+                // 處理對話結束，更新練習列表
+                await handleDialogueEnd(currentPracticeId, data.analysis);
+            } else if (data.response) {
+                // 更新對話顯示，包含音頻檔案路徑
+                updateDialogueDisplay("家長", data.response, data.audioFilePath);
+                recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+                enableUserInput();
+            }
+        }
+
+        currentAccumulatedText = '';
+        
+    } catch (error) {
+        console.error('對話提交錯誤:', error);
+        recordStatus.textContent = `錯誤：${error.message}`;
+        enableUserInput();
+    }
+}
 
 // main.js - 錄音時間限制與進度顯示功能
 
@@ -197,6 +335,27 @@ let isRecording = false;
 const maxDialogues = 12;
 // const MAX_RECORDING_TIME = 120 * 1000; // 最大錄音時間，這裡設定為 120 秒
 let currentAccumulatedText = '';
+
+// 添加全局變數來追蹤當前播放的音頻
+let currentAudioPlayer = null;
+
+// 停止當前播放的音頻
+function stopCurrentAudio() {
+    if (currentAudioPlayer) {
+        currentAudioPlayer.pause();
+        currentAudioPlayer = null;
+    }
+}
+
+// 播放音頻檔案
+function playAudio(audioFilePath) {
+    stopCurrentAudio(); // 停止當前播放的音頻
+    
+    currentAudioPlayer = new Audio(audioFilePath);
+    currentAudioPlayer.play().catch(error => {
+        console.error('播放音頻失敗:', error);
+    });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const welcomeMessage = document.getElementById('welcomeMessage');
@@ -1334,7 +1493,7 @@ function clearTranscriptionPreview() {
     }
 }
 
-function updateDialogueDisplay(speaker, message) {
+function updateDialogueDisplay(speaker, message, audioFilePath = null) {
     if (!message || !message.trim()) return;
 
     // 創建新的訊息元素
@@ -1346,16 +1505,53 @@ function updateDialogueDisplay(speaker, message) {
     const icon = speakerType === '老師' ? '👩‍🏫' : '👤';
     const alignment = speakerType === '老師' ? 'right' : 'left';
     
-    // 構建訊息內容
-    messageDiv.innerHTML = `
+    // 構建訊息內容，包括播放按鈕（對所有回應都顯示）
+    let messageContent = `
         <div class="message-header" style="text-align: ${alignment}">
             ${icon} ${speakerType}
         </div>
-        <div class="message-content">${message}</div>
+        <div class="message-content">
+            ${message}
+            ${audioFilePath ? `
+                <button class="play-audio-btn" onclick="playAudio('${audioFilePath}')" title="播放語音">
+                    🔊 播放
+                </button>
+            ` : ''}
+        </div>
         <div class="message-time" style="text-align: ${alignment}">
             ${new Date().toLocaleTimeString()}
         </div>
     `;
+    
+    messageDiv.innerHTML = messageContent;
+    
+    // 添加樣式
+    const style = document.createElement('style');
+    style.textContent = `
+        .play-audio-btn {
+            background-color: #e93ae1;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 5px 10px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.3s;
+        }
+        
+        .play-audio-btn:hover {
+            background-color: #d32f8f;
+        }
+        
+        .message-content {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+    `;
+    document.head.appendChild(style);
     
     // 添加到對話顯示區域
     dialogueDisplay.appendChild(messageDiv);
@@ -1364,7 +1560,6 @@ function updateDialogueDisplay(speaker, message) {
     dialogueCount++;
     messageDiv.scrollIntoView({ behavior: 'smooth' });
 }
-
 
 // 用戶輸入控制
 function disableUserInput() {
@@ -1534,8 +1729,120 @@ startPracticeBtn.addEventListener('click', async () => {
 // 0301處理對話結束時，更新練習列表
 
 // 更新 startDialogue 函數，支持指定情境
+// 在 main.js 中修改 startDialogue 函數
 
-// 確保 startDialogue 函數在任何地方都使用指定的情境
+// async function startDialogue(practiceId, specifiedScenario = null) {
+//     if (!checkAuthStatus()) {
+//         return;
+//     }
+
+//     const scenarioDisplay = document.getElementById('scenarioDisplay');
+//     const dialogueDisplay = document.getElementById('dialogueDisplay');
+
+//     scenarioDisplay.innerHTML = '';
+//     dialogueDisplay.innerHTML = '';
+
+//     enableUserInput();
+
+//     const spinner = document.getElementById('loadingSpinner');
+//     spinner.classList.add('spinner-visible');
+
+//     try {
+//         // 檢查是否有選擇溝通技巧
+//         const technique = techniqueSelect.value;
+//         const difficulty = difficultySelect.value;
+
+//         dialogueCount = 0; // 重置對話計數
+
+//         if (!technique) {
+//             throw new Error('請選擇溝通技巧');
+//         }
+
+//         console.log('發送開始對話請求，參數:', {
+//             technique,
+//             difficulty,
+//             practiceId,
+//             specifiedScenario
+//         }); 
+
+//         const response = await fetch('/api/dialogue/start-dialogue', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${localStorage.getItem('token')}`
+//             },
+//             body: JSON.stringify({ 
+//                 technique,
+//                 difficulty,
+//                 practiceId,
+//                 specifiedScenario
+//             }),
+//         });
+
+//         if (!response.ok) {
+//             let errorMessage = '開始對話失敗';
+//             try {
+//                 const errorData = await response.json();
+//                 errorMessage = errorData.message || errorData.error || errorMessage;
+//                 console.error('API 錯誤詳情:', errorData);
+//             } catch (e) {
+//                 console.error('解析錯誤回應失敗:', e);
+//             }
+//             throw new Error(errorMessage);
+//         }
+
+//         const data = await response.json();
+        
+//         if (!data.success) {
+//             throw new Error(data.message || 'API 回應失敗');
+//         }
+        
+//         // 顯示情境
+//         scenarioDisplay.innerHTML = `
+//             <div class="message-header">📝 情境</div>
+//             <div class="message-content">${data.scenario || '無法載入情境'}</div>
+//         `;
+
+//         // 清空對話區域
+//         dialogueDisplay.innerHTML = '';
+        
+//         // 移除老師建議開場白的顯示，直接顯示家長的第一句話
+//         // 注意：我們需要為家長的第一句話生成音頻
+//         if (data.response) {
+//             // 為家長的第一句話添加播放功能
+//             // 這裡我們需要修改後端，讓家長的第一句話也有音頻
+//             updateDialogueDisplay("家長", data.response, data.parentAudioFilePath);
+//         }
+
+//         // 啟動挑戰模式倒計時（如果是挑戰模式）
+//         if (difficulty === '挑戰') {
+//             startCountdown();
+//         }
+
+//         // 添加調試日誌
+//         console.log('AI 回應數據:', {
+//             response: data.response,
+//             parentAudioFilePath: data.parentAudioFilePath,
+//             teacherSuggestion: data.teacherSuggestion // 這個不再顯示，但可以保留在後端供參考
+//         });
+
+//     } catch (error) {
+//         console.error('開始對話失敗:', error);
+//         const errorMessage = error.message || '發生未知錯誤';
+//         alert(`錯誤：${errorMessage}`);
+//         scenarioDisplay.innerHTML = `
+//             <div class="message error">
+//                 <div class="message-header">❌ 錯誤 請重試</div>
+//                 <div class="message-content">${errorMessage}</div>
+//             </div>
+//         `;
+//     } finally {
+//         spinner.classList.remove('spinner-visible');
+//     }
+// }
+
+// 在 main.js 中修改 startDialogue 函數
+
 async function startDialogue(practiceId, specifiedScenario = null) {
     if (!checkAuthStatus()) {
         return;
@@ -1602,22 +1909,32 @@ async function startDialogue(practiceId, specifiedScenario = null) {
             throw new Error(data.message || 'API 回應失敗');
         }
         
+        // 顯示情境
         scenarioDisplay.innerHTML = `
             <div class="message-header">📝 情境</div>
             <div class="message-content">${data.scenario || '無法載入情境'}</div>
         `;
 
-        dialogueDisplay.innerHTML = `
-            <div class="message suggestion">
-                <div class="message-header">💡 建議開場白</div>
-                <div class="message-content">${data.teacherSuggestion || '無建議開場白'}</div>
-            </div>
-            <div class="message 家長">
-                <div class="message-header" style="text-align: left">👤 家長</div>
-                <div class="message-content">${data.response || '無回應'}</div>
-                <div class="message-time" style="text-align: left">${new Date().toLocaleTimeString()}</div>
-            </div>
-        `;
+        // 清空對話區域
+        dialogueDisplay.innerHTML = '';
+        
+        // 移除老師建議開場白的顯示，直接顯示家長的第一句話
+        if (data.response) {
+            // 為家長的第一句話添加播放功能
+            updateDialogueDisplay("家長", data.response, data.parentAudioFilePath);
+        }
+
+        // 啟動挑戰模式倒計時（如果是挑戰模式）
+        if (difficulty === '挑戰') {
+            startCountdown();
+        }
+
+        // 添加調試日誌
+        console.log('AI 回應數據:', {
+            response: data.response,
+            parentAudioFilePath: data.parentAudioFilePath,
+            teacherSuggestion: data.teacherSuggestion // 這個不再顯示，但可以保留在後端供參考
+        });
 
     } catch (error) {
         console.error('開始對話失敗:', error);
@@ -1768,157 +2085,6 @@ async function loadRecordingsHistory(practiceId) {
     }
 }
 
-
-// async function handleSubmission(text) {
-//     try {
-//         const difficulty = difficultySelect.value;
-        
-//         isWaitingForSubmission = false;
-//         clearTranscriptionPreview();
-        
-//         recordStatus.textContent = '正在等待 AI 回應...';
-        
-//         if (!text || text.trim().length === 0) {
-//             throw new Error('提交的文字內容為空');
-//         }
-
-//         updateDialogueDisplay("老師", text);
-
-//         const response = await fetch('/api/dialogue/continue-dialogue', {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json',
-//                 'Authorization': `Bearer ${localStorage.getItem('token')}`
-//             },
-//             body: JSON.stringify({
-//                 userResponse: text,
-//                 practiceId: currentPracticeId,
-//                 challengeTimeOver: false
-//             })
-//         });
-
-//         if (!response.ok) {
-//             throw new Error('API 請求失敗');
-//         }
-
-//         const data = await response.json();
-
-//         if (!data) {
-//             throw new Error('無效的回應數據');
-//         }
-
-//         // 檢查回應格式
-//         if (difficulty === '簡單') {
-//             if (data.completed && data.analysis) {
-//                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-//                 disableUserInput();
-//             } else if (data.response) {
-//                 updateDialogueDisplay("家長", data.response);
-//                 if (dialogueCount >= maxDialogues) {
-//                     disableUserInput();
-//                     showEndDialogueMessage();
-//                 } else {
-//                     recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
-//                     enableUserInput();
-//                 }
-//             }
-//         } else if (difficulty === '挑戰') {
-//             if (data.completed && data.analysis) {
-//                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-//                 disableUserInput();
-//             } else if (data.response) {
-//                 updateDialogueDisplay("家長", data.response);
-//                 recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
-//                 enableUserInput();
-//             }
-//         }
-
-//         currentAccumulatedText = '';
-        
-//     } catch (error) {
-//         console.error('對話提交錯誤:', error);
-//         recordStatus.textContent = `錯誤：${error.message}`;
-//         enableUserInput();
-//     }
-// }
-
-//0301 更新
-async function handleSubmission(text) {
-    try {
-        const difficulty = difficultySelect.value;
-        
-        isWaitingForSubmission = false;
-        clearTranscriptionPreview();
-        
-        recordStatus.textContent = ' AI 分析中...';
-        
-        if (!text || text.trim().length === 0) {
-            throw new Error('提交的文字內容為空');
-        }
-
-        updateDialogueDisplay("老師", text);
-
-        const response = await fetch('/api/dialogue/continue-dialogue', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                userResponse: text,
-                practiceId: currentPracticeId,
-                challengeTimeOver: false
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('API 請求失敗');
-        }
-
-        const data = await response.json();
-
-        if (!data) {
-            throw new Error('無效的回應數據');
-        }
-
-        // 檢查回應格式
-        if (difficulty === '簡單') {
-            if (data.completed && data.analysis) {
-                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-                disableUserInput();
-                // 處理對話結束，更新練習列表
-                await handleDialogueEnd(currentPracticeId, data.analysis);
-            } else if (data.response) {
-                updateDialogueDisplay("家長", data.response);
-                if (dialogueCount >= maxDialogues) {
-                    disableUserInput();
-                    showEndDialogueMessage();
-                } else {
-                    recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
-                    enableUserInput();
-                }
-            }
-        } else if (difficulty === '挑戰') {
-            if (data.completed && data.analysis) {
-                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-                disableUserInput();
-                // 處理對話結束，更新練習列表
-                await handleDialogueEnd(currentPracticeId, data.analysis);
-            } else if (data.response) {
-                updateDialogueDisplay("家長", data.response);
-                recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
-                enableUserInput();
-            }
-        }
-
-        currentAccumulatedText = '';
-        
-    } catch (error) {
-        console.error('對話提交錯誤:', error);
-        recordStatus.textContent = `錯誤：${error.message}`;
-        enableUserInput();
-    }
-}
 
 // 0301更新挑戰模式結束邏輯函數
 async function handleChallengeEnd() {
@@ -2149,3 +2315,11 @@ function convertToTraditional(text) {
         throw new Error('轉換失敗');
     });
 }
+
+// 在頁面卸載時停止音頻播放
+window.addEventListener('beforeunload', () => {
+    stopCurrentAudio();
+});
+
+const audio = new Audio('/audio/response.mp3');
+audio.play();
