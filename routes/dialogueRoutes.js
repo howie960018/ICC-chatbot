@@ -12,6 +12,87 @@ const { resetDialogueState, updateDialogueState, getDialogueState } = require('.
 const { generateChatResponse, generateSpeech } = require('../services/openaiService'); // 匯入 OpenAI API 工具和 generateSpeech
 const path = require('path');
 
+// ==================== 非語言數據驗證工具函數 ====================
+
+/**
+ * 限制數值在指定範圍內
+ * @param {Number} value 要限制的值
+ * @param {Number} min 最小值
+ * @param {Number} max 最大值
+ * @returns {Number} 限制後的值
+ */
+function clamp(value, min, max) {
+  if (typeof value !== 'number' || isNaN(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * 驗證並清理非語言數據
+ * @param {Object} data 原始非語言數據
+ * @returns {Object|null} 驗證並清理後的數據,如果無效則返回 null
+ */
+function validateNonverbalData(data) {
+  if (!data || typeof data !== 'object') {
+    console.log('非語言數據為空或格式無效');
+    return null;
+  }
+
+  try {
+    // 基本數值驗證和清理
+    const validated = {
+      eyeContactRate: clamp(parseFloat(data.eyeContactRate) || 0, 0, 100),
+      smileRate: clamp(parseFloat(data.smileRate) || 0, 0, 100),
+      openPostureRate: clamp(parseFloat(data.openPostureRate) || 0, 0, 100),
+      gesturesUsed: Math.max(0, parseInt(data.gesturesUsed) || 0),
+      gesturesList: Array.isArray(data.gesturesList) ? data.gesturesList : [],
+      collectedAt: new Date()
+    };
+
+    // 保存原始統計數據(如果存在)
+    if (data.rawData) {
+      validated.rawData = {
+        eyeContact: {
+          good: parseInt(data.rawData.eyeContact?.good) || 0,
+          total: parseInt(data.rawData.eyeContact?.total) || 0
+        },
+        smile: {
+          smiling: parseInt(data.rawData.smile?.smiling) || 0,
+          total: parseInt(data.rawData.smile?.total) || 0
+        },
+        posture: {
+          open: parseInt(data.rawData.posture?.open) || 0,
+          total: parseInt(data.rawData.posture?.total) || 0
+        }
+      };
+    }
+
+    // 數據品質指標(如果存在)
+    if (data.dataQuality) {
+      validated.dataQuality = {
+        sampleCount: parseInt(data.dataQuality.sampleCount) || 0,
+        duration: parseFloat(data.dataQuality.duration) || 0,
+        faceDetectionRate: clamp(parseFloat(data.dataQuality.faceDetectionRate) || 0, 0, 100)
+      };
+    }
+
+    console.log('✅ 非語言數據驗證成功:', {
+      eyeContactRate: validated.eyeContactRate,
+      smileRate: validated.smileRate,
+      openPostureRate: validated.openPostureRate,
+      gesturesUsed: validated.gesturesUsed
+    });
+
+    return validated;
+  } catch (error) {
+    console.error('❌ 非語言數據驗證失敗:', error);
+    return null;
+  }
+}
+
+// ==================== 路由處理 ====================
+
 // 在 dialogueRoutes.js 中修改 start-dialogue 路由
 
 router.post('/start-dialogue', async (req, res) => {
@@ -552,8 +633,13 @@ function parseInitialResponse(response) {
 // 更新 continue-dialogue 路由，確保在對話完成時更新分析結果
 router.post('/continue-dialogue', async (req, res) => {
     try {
-        const { userResponse, practiceId, challengeTimeOver } = req.body;
+        const { userResponse, practiceId, challengeTimeOver, nonverbalData } = req.body;
         console.log("收到請求：", req.body);
+
+        // 如果有非語言數據，記錄到日誌
+        if (nonverbalData) {
+            console.log("收到非語言數據:", nonverbalData);
+        }
 
         if (!practiceId) {
             throw new Error('練習 ID 缺失');
@@ -584,7 +670,21 @@ router.post('/continue-dialogue', async (req, res) => {
 
         // 添加導師的回應到對話歷史
         if (userResponse && userResponse.trim()) {
-            addToHistory({ role: "導師", content: userResponse });
+            // 驗證並清理非語言數據
+            const validatedNonverbalData = validateNonverbalData(nonverbalData);
+
+            // 建立歷史記錄項目
+            const historyEntry = {
+                role: "導師",
+                content: userResponse
+            };
+
+            // 只有在驗證成功時才添加非語言數據
+            if (validatedNonverbalData) {
+                historyEntry.nonverbalData = validatedNonverbalData;
+            }
+
+            addToHistory(historyEntry);
             incrementCount();
         }
 

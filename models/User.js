@@ -52,6 +52,61 @@ const UserSchema = new mongoose.Schema({
           content: {
             type: String, // 聊天內容
             required: [true, '聊天內容為必填']
+          },
+          timestamp: {
+            type: Date,
+            default: Date.now
+          },
+          // 非語言數據欄位(僅導師回應有此欄位)
+          nonverbalData: {
+            eyeContactRate: {
+              type: Number, // 眼神接觸率 (0-100)
+              min: 0,
+              max: 100
+            },
+            smileRate: {
+              type: Number, // 微笑率 (0-100)
+              min: 0,
+              max: 100
+            },
+            openPostureRate: {
+              type: Number, // 開放姿態率 (0-100)
+              min: 0,
+              max: 100
+            },
+            gesturesUsed: {
+              type: Number, // 手勢使用次數
+              min: 0
+            },
+            gesturesList: [{
+              name: String, // 手勢名稱 (Thumb_Up, Victory, etc.)
+              timestamp: Number // 發生時間戳
+            }],
+            // 原始統計數據(用於除錯/驗證)
+            rawData: {
+              eyeContact: {
+                good: Number,
+                total: Number
+              },
+              smile: {
+                smiling: Number,
+                total: Number
+              },
+              posture: {
+                open: Number,
+                total: Number
+              }
+            },
+            // 數據品質指標
+            dataQuality: {
+              sampleCount: Number,      // 採樣幀數
+              duration: Number,         // 錄音時長(秒)
+              faceDetectionRate: Number // 臉部偵測成功率
+            },
+            collectedAt: {
+              type: Date,
+              default: Date.now
+            }
           }
         }
       ],
@@ -104,7 +159,17 @@ const UserSchema = new mongoose.Schema({
             default: Date.now
           }
         }
-      ]
+      ],
+
+      // 整體練習的非語言表現摘要
+      nonverbalSummary: {
+        averageEyeContactRate: Number,
+        averageSmileRate: Number,
+        averageOpenPostureRate: Number,
+        totalGesturesUsed: Number,
+        teacherTurnsWithNonverbalData: Number, // 有非語言數據的導師回合數
+        calculatedAt: Date
+      }
     }
   ],
   resetPasswordToken: String,

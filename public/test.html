@@ -4,6 +4,12 @@
     <title>CommAI系統</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- MediaPipe Libraries for Nonverbal Analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
     <!-- Microsoft Clarity 追蹤程式碼 -->
     <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
@@ -156,6 +162,74 @@
             color: white;
             transform: translateY(-2px);
         }
+
+        /* 非語言分析視窗樣式 */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #output_canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #222; /* 深灰色背景,便於調試 */
+            min-height: 480px; /* 最小高度 */
+        }
+
+        /* HUD 面板 */
+        .hud-panel {
+            position: absolute;
+            padding: 10px 15px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            color: white;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 140px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hud-tl { top: 10px; left: 10px; }
+        .hud-tr { top: 10px; right: 10px; justify-content: flex-end; }
+        .hud-bl { bottom: 10px; left: 10px; }
+        .hud-br { bottom: 10px; right: 10px; justify-content: flex-end; }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            box-shadow: 0 0 6px currentColor;
+        }
+
+        .status-good { color: #00b894; background: #00b894; }
+        .status-warn { color: #fdcb6e; background: #fdcb6e; }
+        .status-bad { color: #d63031; background: #d63031; }
+
+        .hud-label {
+            font-size: 0.7em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hud-value {
+            font-size: 1em;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        .icon {
+            font-size: 1.3em;
+        }
     </style>
 </head>
 <body>
@@ -219,6 +293,15 @@
                         <option value="簡單">基礎模式</option>
                         <option value="挑戰">挑戰模式</option>
                     </select>
+                    <div style="margin: 10px 0;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="enableNonverbalDetection" style="width: 18px; height: 18px; cursor: pointer;">
+                            <span style="font-size: 16px; font-weight: 500;">啟用非語言行為偵測</span>
+                        </label>
+                        <p style="margin: 5px 0 0 26px; font-size: 13px; color: #666;">
+                            (啟用後將自動開啟前鏡頭,並在對話過程中分析您的眼神、表情、姿態及手勢)
+                        </p>
+                    </div>
                     <button id="startPracticeBtn">開始練習</button>
                 </div>
 
@@ -226,11 +309,11 @@
                 <div id="dialogueDisplay" class="panel"></div>
 
                 <div class="record-controls panel">
-                    <div class="input-method-selector">
+                    <div class="input-method-selector" id="inputMethodSelector">
                         <label>
                             <input type="radio" name="inputMethod" value="voice" checked> 語音輸入
                         </label>
-                        <label>
+                        <label id="textInputLabel">
                             <input type="radio" name="inputMethod" value="text"> 文字輸入
                         </label>
                     </div>
@@ -258,6 +341,48 @@
                     <div id="analysisContent"></div>
                 </div>
 
+                <!-- 非語言行為分析視窗 -->
+                <div id="nonverbalWindow" class="panel" style="display: none;">
+                    <h3>非語言行為即時分析</h3>
+                    <div class="video-wrapper">
+                        <video id="input_video" autoplay playsinline style="display: none;"></video>
+                        <canvas id="output_canvas"></canvas>
+
+                        <!-- HUD 面板 -->
+                        <div class="hud-panel hud-tl" id="hud-gaze">
+                            <div class="indicator status-warn" id="ind-gaze"></div>
+                            <div>
+                                <div class="hud-label">眼神接觸</div>
+                                <div class="hud-value" id="val-gaze">等待中</div>
+                            </div>
+                        </div>
+
+                        <div class="hud-panel hud-tr" id="hud-smile">
+                            <div>
+                                <div class="hud-label">表情</div>
+                                <div class="hud-value" id="val-smile">--</div>
+                            </div>
+                            <span class="icon">😊</span>
+                        </div>
+
+                        <div class="hud-panel hud-bl" id="hud-pose">
+                            <span class="icon">🛡️</span>
+                            <div>
+                                <div class="hud-label">姿態</div>
+                                <div class="hud-value" id="val-pose">--</div>
+                            </div>
+                        </div>
+
+                        <div class="hud-panel hud-br" id="hud-hand">
+                            <div>
+                                <div class="hud-label">手勢</div>
+                                <div class="hud-value" id="val-hand">無</div>
+                            </div>
+                            <span class="icon">✋</span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <div class="recordings-sidebar">
@@ -279,5 +404,6 @@
 
     <script src="/js/main.js"></script>
     <script src="/js/onboarding.js"></script>
+    <script type="module" src="/js/nonverbal-analysis.js"></script>
 </body>
 </html>

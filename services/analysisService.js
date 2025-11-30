@@ -16,8 +16,50 @@ async function analyzeDialogue(practiceId) {
   }
 
   const limitedHistory = dialogueState.history.slice(-15);
+
+  // 聚合所有對話的非語言數據
+  let aggregatedNonverbalData = null;
+  let nonverbalEntries = [];
+
+  for (const entry of limitedHistory) {
+    if (entry.nonverbalData) {
+      nonverbalEntries.push(entry.nonverbalData);
+    }
+  }
+
+  // 如果有非語言數據,計算平均值
+  if (nonverbalEntries.length > 0) {
+    let totalEyeContact = 0;
+    let totalSmile = 0;
+    let totalOpenPosture = 0;
+    let totalGestures = 0;
+    let allGestures = [];
+
+    nonverbalEntries.forEach(data => {
+      totalEyeContact += parseFloat(data.eyeContactRate) || 0;
+      totalSmile += parseFloat(data.smileRate) || 0;
+      totalOpenPosture += parseFloat(data.openPostureRate) || 0;
+      totalGestures += parseInt(data.gesturesUsed) || 0;
+      if (data.gesturesList) {
+        allGestures = allGestures.concat(data.gesturesList);
+      }
+    });
+
+    const count = nonverbalEntries.length;
+    aggregatedNonverbalData = {
+      eyeContactRate: (totalEyeContact / count).toFixed(1),
+      smileRate: (totalSmile / count).toFixed(1),
+      openPostureRate: (totalOpenPosture / count).toFixed(1),
+      gesturesUsed: totalGestures,
+      gesturesList: allGestures,
+      sampleCount: count
+    };
+
+    console.log('聚合的非語言數據:', aggregatedNonverbalData);
+  }
+
   const conversationHistory = limitedHistory.map(entry => `${entry.role}: ${entry.content}`).join('\n');
-  const prompt = generatePrompt(dialogueState.technique, conversationHistory);
+  const prompt = generatePrompt(dialogueState.technique, conversationHistory, aggregatedNonverbalData);
 
   try {
 
@@ -37,26 +79,56 @@ async function analyzeDialogue(practiceId) {
  * 根據溝通技巧生成分析提示
  * @param {String} technique 溝通技巧名稱
  * @param {String} conversationHistory 對話歷史文本
+ * @param {Object} nonverbalData 非語言行為數據
  * @returns {String} 生成的分析提示
  */
-function generatePrompt(technique, conversationHistory) {
+function generatePrompt(technique, conversationHistory, nonverbalData = null) {
   switch (technique) {
     case '我訊息':
-      return generateIMessagePrompt(conversationHistory);
+      return generateIMessagePrompt(conversationHistory, nonverbalData);
     case '三明治溝通法':
-      return generateSandwichPrompt(conversationHistory);
+      return generateSandwichPrompt(conversationHistory, nonverbalData);
     case '綜合溝通技巧':
-      return generateComprehensivePrompt(conversationHistory);
+      return generateComprehensivePrompt(conversationHistory, nonverbalData);
     default:
-      return generateDefaultPrompt(conversationHistory);
+      return generateDefaultPrompt(conversationHistory, nonverbalData);
   }
 }
 
 /**
  * 我訊息的分析提示模板
  */
-function generateIMessagePrompt(conversationHistory) {
-  return `分析整段對話，針對導師的回應，評估是否正確使用了「我訊息」溝通技巧，並依照A至D的評分標準給予評分與詳細回饋。請不要分析家長的回應，僅針對導師的溝通表現進行評估。
+function generateIMessagePrompt(conversationHistory, nonverbalData = null) {
+  // 構建非語言行為的分析文字
+  let nonverbalSection = '';
+  if (nonverbalData) {
+    nonverbalSection = `
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    【非語言行為數據】(基於 ${nonverbalData.sampleCount || 1} 次對話的平均值)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    📊 統計數據:
+    - 眼神接觸率: ${nonverbalData.eyeContactRate}% ${nonverbalData.eyeContactRate >= 70 ? '✅ 良好' : nonverbalData.eyeContactRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 微笑率: ${nonverbalData.smileRate}% ${nonverbalData.smileRate >= 60 ? '✅ 良好' : nonverbalData.smileRate >= 40 ? '⚠️ 普通' : '❌ 需改進'}
+    - 開放姿態率: ${nonverbalData.openPostureRate}% ${nonverbalData.openPostureRate >= 70 ? '✅ 良好' : nonverbalData.openPostureRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 手勢使用次數: ${nonverbalData.gesturesUsed} 次
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ⚠️ 重要：請務必在分析中納入非語言行為評估
+    1. 在「整體回饋」中明確評論導師的非語言溝通表現
+    2. 在「具體修正建議」中至少提供 2-3 點關於非語言行為的改進建議
+    3. 針對眼神接觸、表情、姿態分別給予具體建議
+    4. 如果數據顯示需改進,請說明如何改善
+
+    【語音表達建議】
+    由於本次對話使用語音輸入,請額外針對以下方面給予建議:
+    - 語速控制：建議保持適中語速 (約 200-250 字/分鐘)
+    - 語調變化：適當的語調起伏能增強表達效果和親和力
+    - 停頓技巧：適時停頓可讓對方有思考和回應的空間
+    - 音量控制：清晰、穩定的音量展現自信與專業`;
+  }
+
+  return `分析整段對話，針對導師的回應，評估是否正確使用了「我訊息」溝通技巧，並依照A至D的評分標準給予評分與詳細回饋。請不要分析家長的回應，僅針對導師的溝通表現進行評估。${nonverbalSection}
 
     評分標準：
     A 等級 (優秀)：
@@ -105,8 +177,32 @@ function generateIMessagePrompt(conversationHistory) {
     ${conversationHistory}`;
 }
 
-function generateSandwichPrompt(conversationHistory) {
-  return `分析整段對話，針對導師的回應，用繁體中文分析是否正確使用了三明治溝通法技巧(不用對家長給出分析建議)，給導師以下格式的分析，根據評量標準給予導師整段對話的表現等第、整體回饋與修正建議：
+function generateSandwichPrompt(conversationHistory, nonverbalData = null) {
+  // 構建非語言行為的分析文字
+  let nonverbalSection = '';
+  if (nonverbalData) {
+    nonverbalSection = `
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    【非語言行為數據】(基於 ${nonverbalData.sampleCount || 1} 次對話的平均值)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    📊 統計數據:
+    - 眼神接觸率: ${nonverbalData.eyeContactRate}% ${nonverbalData.eyeContactRate >= 70 ? '✅ 良好' : nonverbalData.eyeContactRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 微笑率: ${nonverbalData.smileRate}% ${nonverbalData.smileRate >= 60 ? '✅ 良好' : nonverbalData.smileRate >= 40 ? '⚠️ 普通' : '❌ 需改進'}
+    - 開放姿態率: ${nonverbalData.openPostureRate}% ${nonverbalData.openPostureRate >= 70 ? '✅ 良好' : nonverbalData.openPostureRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 手勢使用次數: ${nonverbalData.gesturesUsed} 次
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ⚠️ 重要：請務必在分析中納入非語言行為評估
+    1. 在「整體回饋」中明確評論導師的非語言溝通表現
+    2. 在「具體修正建議」中至少提供 2-3 點關於非語言行為的改進建議
+    3. 針對眼神接觸、表情、姿態分別給予具體建議
+
+    【語音表達建議】
+    請額外針對語速、語調、停頓、音量等語音表達技巧給予建議。`;
+  }
+
+  return `分析整段對話，針對導師的回應，用繁體中文分析是否正確使用了三明治溝通法技巧(不用對家長給出分析建議)，給導師以下格式的分析，根據評量標準給予導師整段對話的表現等第、整體回饋與修正建議：${nonverbalSection}
 
     三明治溝通法的參考評分標準:  
     評分等第：
@@ -153,8 +249,32 @@ function generateSandwichPrompt(conversationHistory) {
     ${conversationHistory}`;
 }
 
-function generateComprehensivePrompt(conversationHistory) {
-  return `用繁體中文分析整段對話，針對導師的回應，請根據以下四項指標進行評估，並給出導師以下格式的分析：
+function generateComprehensivePrompt(conversationHistory, nonverbalData = null) {
+  // 構建非語言行為的分析文字
+  let nonverbalSection = '';
+  if (nonverbalData) {
+    nonverbalSection = `
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    【非語言行為數據】(基於 ${nonverbalData.sampleCount || 1} 次對話的平均值)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    📊 統計數據:
+    - 眼神接觸率: ${nonverbalData.eyeContactRate}% ${nonverbalData.eyeContactRate >= 70 ? '✅ 良好' : nonverbalData.eyeContactRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 微笑率: ${nonverbalData.smileRate}% ${nonverbalData.smileRate >= 60 ? '✅ 良好' : nonverbalData.smileRate >= 40 ? '⚠️ 普通' : '❌ 需改進'}
+    - 開放姿態率: ${nonverbalData.openPostureRate}% ${nonverbalData.openPostureRate >= 70 ? '✅ 良好' : nonverbalData.openPostureRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 手勢使用次數: ${nonverbalData.gesturesUsed} 次
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ⚠️ 重要：請務必在分析中納入非語言行為評估
+    1. 在「整體回饋」中明確評論導師的非語言溝通表現
+    2. 在「修正建議」中至少提供 2-3 點關於非語言行為的改進建議
+    3. 針對眼神接觸、表情、姿態分別給予具體建議
+
+    【語音表達建議】
+    請額外針對語速、語調、停頓、音量等語音表達技巧給予建議。`;
+  }
+
+  return `用繁體中文分析整段對話，針對導師的回應，請根據以下四項指標進行評估，並給出導師以下格式的分析：${nonverbalSection}
 
     評分標準：
 
@@ -214,9 +334,27 @@ function generateComprehensivePrompt(conversationHistory) {
     ${conversationHistory}`;
 }
 
-function generateDefaultPrompt(conversationHistory) {
-  return `分析整段對話，針對導師的回應，指出導師的表現以及如何改進。不用分析家長的，請開始分析：
-    
+function generateDefaultPrompt(conversationHistory, nonverbalData = null) {
+  // 構建非語言行為的分析文字
+  let nonverbalSection = '';
+  if (nonverbalData) {
+    nonverbalSection = `
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    【非語言行為數據】(基於 ${nonverbalData.sampleCount || 1} 次對話的平均值)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    📊 統計數據:
+    - 眼神接觸率: ${nonverbalData.eyeContactRate}% ${nonverbalData.eyeContactRate >= 70 ? '✅ 良好' : nonverbalData.eyeContactRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 微笑率: ${nonverbalData.smileRate}% ${nonverbalData.smileRate >= 60 ? '✅ 良好' : nonverbalData.smileRate >= 40 ? '⚠️ 普通' : '❌ 需改進'}
+    - 開放姿態率: ${nonverbalData.openPostureRate}% ${nonverbalData.openPostureRate >= 70 ? '✅ 良好' : nonverbalData.openPostureRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
+    - 手勢使用次數: ${nonverbalData.gesturesUsed} 次
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ⚠️ 重要：請務必在分析中納入非語言行為評估和語音表達建議。`;
+  }
+
+  return `分析整段對話，針對導師的回應，指出導師的表現以及如何改進。不用分析家長的，請開始分析：${nonverbalSection}
+
     對話歷史：
     ${conversationHistory}`;
 }

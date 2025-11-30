@@ -1,5 +1,62 @@
 const User = require('../models/User');
 const mongoose = require('mongoose');
+
+// ==================== 非語言數據統計工具函數 ====================
+
+/**
+ * 計算練習的非語言表現摘要
+ * @param {Array} history 對話歷史記錄
+ * @returns {Object|null} 非語言表現摘要,如果沒有數據則返回 null
+ */
+function calculateNonverbalSummary(history) {
+  if (!Array.isArray(history) || history.length === 0) {
+    console.log('對話歷史為空,無法計算非語言摘要');
+    return null;
+  }
+
+  // 過濾出有非語言數據的導師回應
+  const teacherEntries = history.filter(
+    entry => entry.role === '導師' && entry.nonverbalData
+  );
+
+  if (teacherEntries.length === 0) {
+    console.log('沒有找到包含非語言數據的導師回應');
+    return null;
+  }
+
+  console.log(`找到 ${teacherEntries.length} 筆導師回應包含非語言數據`);
+
+  // 計算各項指標的總和
+  let totalEyeContact = 0;
+  let totalSmile = 0;
+  let totalOpenPosture = 0;
+  let totalGestures = 0;
+
+  teacherEntries.forEach(entry => {
+    const data = entry.nonverbalData;
+    totalEyeContact += parseFloat(data.eyeContactRate) || 0;
+    totalSmile += parseFloat(data.smileRate) || 0;
+    totalOpenPosture += parseFloat(data.openPostureRate) || 0;
+    totalGestures += parseInt(data.gesturesUsed) || 0;
+  });
+
+  const count = teacherEntries.length;
+
+  const summary = {
+    averageEyeContactRate: parseFloat((totalEyeContact / count).toFixed(1)),
+    averageSmileRate: parseFloat((totalSmile / count).toFixed(1)),
+    averageOpenPostureRate: parseFloat((totalOpenPosture / count).toFixed(1)),
+    totalGesturesUsed: totalGestures,
+    teacherTurnsWithNonverbalData: count,
+    calculatedAt: new Date()
+  };
+
+  console.log('✅ 非語言摘要計算完成:', summary);
+
+  return summary;
+}
+
+// ==================== 練習服務函數 ====================
 /**
  * 更新指定練習的資料
  * @param {String} userId 使用者 ID
@@ -65,6 +122,15 @@ async function updatePractice(practiceId, updates) {
       }
       if (updatesObj.completed !== undefined) {
           practice.completed = updatesObj.completed;
+      }
+
+      // 如果更新包含 history 且對話已完成,計算非語言摘要
+      if (updatesObj.history && updatesObj.completed) {
+          const nonverbalSummary = calculateNonverbalSummary(practice.history);
+          if (nonverbalSummary) {
+              practice.nonverbalSummary = nonverbalSummary;
+              console.log('✅ 非語言摘要已添加到練習中');
+          }
       }
 
       console.log('練習更新前的內容:', practice);
@@ -253,5 +319,6 @@ module.exports = {
   getPracticeDetails,
   createPractice,
   deletePractice,
-  getPracticeWithRetries
+  getPracticeWithRetries,
+  calculateNonverbalSummary
 };
