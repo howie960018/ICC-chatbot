@@ -83,9 +83,9 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 生成 JWT
+    // 生成 JWT (包含 role)
     const token = jwt.sign(
-      { id: user._id, username: user.username },
+      { id: user._id, username: user.username, role: user.role },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
@@ -96,7 +96,8 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
 

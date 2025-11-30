@@ -141,6 +141,13 @@ app.use('/api/practice', authMiddleware, practiceRoutes);
 const nonverbalRoutes = require('./routes/nonverbalRoutes');
 app.use('/api/nonverbal', authMiddleware, nonverbalRoutes);
 
+// Admin 管理後台路由
+const adminRoutes = require('./routes/adminRoutes');
+const adminAuth = require('./middleware/adminAuth');
+// Login route 不需要認證
+app.use('/api/admin', adminRoutes);
+// 其他 admin 路由需要 admin 權限保護在 route 內部處理
+
 // 添加 favicon 處理
 app.get('/favicon.ico', (req, res) => res.status(204));
 

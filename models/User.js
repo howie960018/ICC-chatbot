@@ -24,6 +24,11 @@ const UserSchema = new mongoose.Schema({
     required: [true, '密碼為必填'],
     minlength: [6, '密碼至少需要6個字元']
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
   createdAt: {
     type: Date,
     default: Date.now
