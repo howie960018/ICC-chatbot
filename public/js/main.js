@@ -695,27 +695,168 @@ function displayPracticeDetails(practice, nonverbalData) {
         analysisContent.textContent = '尚無分析結果';
     }
 
-    // 顯示非語言分析 (修復了 fixPracticeRoutes 中的錯誤邏輯並放在這裡)
-    let nonverbalDisplay = document.getElementById('nonverbalDisplay');
-    if (!nonverbalDisplay) {
-        nonverbalDisplay = document.createElement('div');
-        nonverbalDisplay.id = 'nonverbalDisplay';
-        analysisContent.parentNode.insertBefore(nonverbalDisplay, analysisContent.nextSibling);
-    }
-    
+    // 顯示非語言分析
+    const nonverbalDisplayPanel = document.getElementById('nonverbalDataDisplay');
+    const nonverbalDataContent = document.getElementById('nonverbalDataContent');
+
     if (nonverbalData && nonverbalData.hasNonverbalData && Array.isArray(nonverbalData.details)) {
-        let html = `<h3 style="margin-top:1em;">非語言數據分析</h3>`;
-        html += `<table class="nonverbal-table"><thead><tr><th>輪次</th><th>內容預覽</th><th>眼神接觸率</th><th>微笑率</th><th>開放姿態率</th><th>手勢次數</th><th>手勢列表</th><th>數據品質</th></tr></thead><tbody>`;
-        nonverbalData.details.forEach(d => {
-            html += `<tr><td>${d.turnNumber}</td><td>${d.content}</td><td>${d.nonverbalData.eyeContactRate ?? '-'}</td><td>${d.nonverbalData.smileRate ?? '-'}</td><td>${d.nonverbalData.openPostureRate ?? '-'}</td><td>${d.nonverbalData.gesturesUsed ?? '-'}</td><td>${Array.isArray(d.nonverbalData.gesturesList) ? d.nonverbalData.gesturesList.join(', ') : '-'}</td><td>${d.nonverbalData.dataQuality ?? '-'}</td></tr>`;
-        });
-        html += `</tbody></table>`;
+        // 顯示非語言數據面板
+        nonverbalDisplayPanel.style.display = 'block';
+
+        let html = '';
+
+        // 如果有摘要,顯示整體指標卡片
         if (nonverbalData.summary) {
-            html += `<div class="nonverbal-summary"><strong>摘要：</strong>${nonverbalData.summary}</div>`;
+            html += `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9;">眼神接觸率</div>
+                        <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.averageEyeContactRate}%</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 10px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9;">微笑率</div>
+                        <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.averageSmileRate}%</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 10px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9;">開放姿態率</div>
+                        <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.averageOpenPostureRate}%</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 10px; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9;">總手勢次數</div>
+                        <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.totalGesturesUsed}</div>
+                    </div>
+                </div>
+            `;
         }
-        nonverbalDisplay.innerHTML = html;
+
+        // 顯示每輪數據的雷達圖
+        html += `
+            <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h4 style="margin-top: 0;">📈 各輪次表現趨勢</h4>
+                <canvas id="nonverbalTrendChart" style="max-height: 300px;"></canvas>
+            </div>
+        `;
+
+        // 顯示詳細數據表格
+        html += `
+            <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h4 style="margin-top: 0;">📋 詳細數據</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f5f5f5;">
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">輪次</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">內容預覽</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">眼神接觸</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">微笑</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">姿態</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">手勢</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">品質</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        nonverbalData.details.forEach((d, index) => {
+            const eyeRate = d.nonverbalData.eyeContactRate ?? 0;
+            const smileRate = d.nonverbalData.smileRate ?? 0;
+            const postureRate = d.nonverbalData.openPostureRate ?? 0;
+
+            const getRateBadge = (rate) => {
+                if (rate >= 80) return `<span style="background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${rate}%</span>`;
+                if (rate >= 60) return `<span style="background: #ffc107; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${rate}%</span>`;
+                if (rate >= 40) return `<span style="background: #fd7e14; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${rate}%</span>`;
+                return `<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${rate}%</span>`;
+            };
+
+            const gestures = d.nonverbalData.gesturesList && d.nonverbalData.gesturesList.length > 0
+                ? d.nonverbalData.gesturesList.map(g => g.name).join(', ')
+                : '無';
+
+            const quality = d.nonverbalData.dataQuality
+                ? `${d.nonverbalData.dataQuality.sampleCount} 幀 / ${d.nonverbalData.dataQuality.faceDetectionRate}% 偵測率`
+                : '-';
+
+            html += `
+                <tr style="border-bottom: 1px solid #eee; ${index % 2 === 0 ? 'background: #fafafa;' : ''}">
+                    <td style="padding: 12px;">${d.turnNumber}</td>
+                    <td style="padding: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${d.content}</td>
+                    <td style="padding: 12px; text-align: center;">${getRateBadge(eyeRate)}</td>
+                    <td style="padding: 12px; text-align: center;">${getRateBadge(smileRate)}</td>
+                    <td style="padding: 12px; text-align: center;">${getRateBadge(postureRate)}</td>
+                    <td style="padding: 12px; text-align: center;">${d.nonverbalData.gesturesUsed ?? 0}</td>
+                    <td style="padding: 12px; font-size: 12px; color: #666;">${quality}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        nonverbalDataContent.innerHTML = html;
+
+        // 繪製趨勢圖表
+        setTimeout(() => {
+            const canvas = document.getElementById('nonverbalTrendChart');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: nonverbalData.details.map(d => `第${d.turnNumber}輪`),
+                        datasets: [
+                            {
+                                label: '眼神接觸率',
+                                data: nonverbalData.details.map(d => d.nonverbalData.eyeContactRate ?? 0),
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: '微笑率',
+                                data: nonverbalData.details.map(d => d.nonverbalData.smileRate ?? 0),
+                                borderColor: '#f5576c',
+                                backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                                tension: 0.4
+                            },
+                            {
+                                label: '開放姿態率',
+                                data: nonverbalData.details.map(d => d.nonverbalData.openPostureRate ?? 0),
+                                borderColor: '#4facfe',
+                                backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: '百分比 (%)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+        }, 100);
     } else {
-        nonverbalDisplay.innerHTML = '<p>尚無非語言數據</p>';
+        nonverbalDisplayPanel.style.display = 'none';
     }
     
     // 顯示對話歷史

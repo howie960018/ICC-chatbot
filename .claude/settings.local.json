@@ -8,7 +8,8 @@
       "Bash(taskkill:*)",
       "Bash(npm start)",
       "Bash(timeout /t 3)",
-      "Bash(node app.js:*)"
+      "Bash(node app.js:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

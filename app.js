@@ -137,6 +137,10 @@ app.use('/api/dialogue', authMiddleware, (req, res, next) => {
 const practiceRoutes = require('./routes/practiceRoutes');
 app.use('/api/practice', authMiddleware, practiceRoutes);
 
+// 非語言數據API路由
+const nonverbalRoutes = require('./routes/nonverbalRoutes');
+app.use('/api/nonverbal', authMiddleware, nonverbalRoutes);
+
 // 添加 favicon 處理
 app.get('/favicon.ico', (req, res) => res.status(204));
 

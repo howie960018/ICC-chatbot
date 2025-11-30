@@ -10,6 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Microsoft Clarity 追蹤程式碼 -->
     <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
@@ -339,6 +342,12 @@
                 <div id="analysisDisplay" class="panel">
                     <h3>分析結果</h3>
                     <div id="analysisContent"></div>
+                </div>
+
+                <!-- 非語言數據分析顯示區域 -->
+                <div id="nonverbalDataDisplay" class="panel" style="display: none;">
+                    <h3>📊 非語言溝通表現分析</h3>
+                    <div id="nonverbalDataContent"></div>
                 </div>
 
                 <!-- 非語言行為分析視窗 -->

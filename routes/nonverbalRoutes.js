@@ -1,16 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { authenticateToken } = require('../middleware/auth');
+
+console.log('✅ nonverbalRoutes.js 已載入');
 
 /**
  * GET /api/nonverbal/practice/:practiceId
  * 獲取單次練習的非語言分析詳情
  */
-router.get('/practice/:practiceId', authenticateToken, async (req, res) => {
+router.get('/practice/:practiceId', async (req, res) => {
+    console.log('🔍 /practice/:practiceId route called');
+    console.log('📋 Request params:', req.params);
+    console.log('👤 User info:', req.user);
     try {
         const { practiceId } = req.params;
         const userId = req.user.id;
+        console.log(`查找用戶 ${userId} 的練習 ${practiceId}`);
 
         // 查找用戶和練習
         const user = await User.findById(userId);
@@ -55,7 +60,8 @@ router.get('/practice/:practiceId', authenticateToken, async (req, res) => {
         res.json(response);
 
     } catch (error) {
-        console.error('獲取練習非語言數據失敗:', error);
+        console.error('❌ 獲取練習非語言數據失敗:', error);
+        console.error('錯誤堆疊:', error.stack);
         res.status(500).json({
             success: false,
             message: '獲取數據失敗',
@@ -69,7 +75,8 @@ router.get('/practice/:practiceId', authenticateToken, async (req, res) => {
  * 獲取使用者的非語言表現進步趨勢
  * Query params: technique (optional) - 過濾特定技巧
  */
-router.get('/progress', authenticateToken, async (req, res) => {
+router.get('/progress', async (req, res) => {
+    console.log('🔍 /progress route called');
     try {
         const userId = req.user.id;
         const { technique } = req.query;
@@ -130,10 +137,10 @@ router.get('/progress', authenticateToken, async (req, res) => {
  * GET /api/nonverbal/comparison/:practiceId1/:practiceId2
  * 比較兩次練習的非語言表現
  */
-router.get('/comparison/:practiceId1/:practiceId2', authenticateToken, async (req, res) => {
+router.get('/comparison/:practiceId1/:practiceId2', async (req, res) => {
     try {
         const { practiceId1, practiceId2 } = req.params;
-        const userId = req.user.userId;
+        const userId = req.user.id;
 
         const user = await User.findById(userId);
         if (!user) {
@@ -217,9 +224,10 @@ router.get('/comparison/:practiceId1/:practiceId2', authenticateToken, async (re
  * GET /api/nonverbal/stats
  * 獲取使用者的非語言數據整體統計
  */
-router.get('/stats', authenticateToken, async (req, res) => {
+router.get('/stats', async (req, res) => {
+    console.log('🔍 /stats route called');
     try {
-        const userId = req.user.userId;
+        const userId = req.user.id;
 
         const user = await User.findById(userId);
         if (!user) {
