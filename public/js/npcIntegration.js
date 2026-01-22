@@ -116,6 +116,11 @@ class NPCAvatarController {
     show() {
         if (this.avatarPanel) {
             this.avatarPanel.style.display = 'block';
+            // 顯示外層並排容器
+            const dialogueWithAvatar = document.getElementById('dialogueWithAvatar');
+            if (dialogueWithAvatar) {
+                dialogueWithAvatar.style.display = 'flex';
+            }
             // 更新標題顯示當前角色
             const title = this.avatarPanel.querySelector('h3');
             if (title) {
@@ -129,6 +134,11 @@ class NPCAvatarController {
         if (this.avatarPanel) {
             this.avatarPanel.style.display = 'none';
             this.stopTalkingAnimation();
+            // 隱藏外層並排容器
+            const dialogueWithAvatar = document.getElementById('dialogueWithAvatar');
+            if (dialogueWithAvatar) {
+                dialogueWithAvatar.style.display = 'none';
+            }
         }
     }
     

@@ -717,7 +717,8 @@ function displayPracticeDetails(practice, nonverbalData) {
     const nonverbalDisplayPanel = document.getElementById('nonverbalDataDisplay');
     const nonverbalDataContent = document.getElementById('nonverbalDataContent');
 
-    if (nonverbalData && nonverbalData.hasNonverbalData && Array.isArray(nonverbalData.details)) {
+    // 修改判斷邏輯：只有在「後端有數據」且「該練習紀錄標記為已啟用非語言偵測」時才顯示
+    if (nonverbalData && nonverbalData.hasNonverbalData && Array.isArray(nonverbalData.details) && practice.isNonverbalEnabled) {
         // 顯示非語言數據面板
         nonverbalDisplayPanel.style.display = 'block';
 
@@ -874,11 +875,20 @@ function displayPracticeDetails(practice, nonverbalData) {
             }
         }, 100);
     } else {
+        // 如果沒有偵測數據，或者該練習根本沒開啟偵測，就隱藏整個區塊
         nonverbalDisplayPanel.style.display = 'none';
+        if (nonverbalDataContent) nonverbalDataContent.innerHTML = '';
     }
     
     // 顯示對話歷史
     const dialogueDisplay = document.getElementById('dialogueDisplay');
+    
+    // 🆕 新增：顯示對話與角色容器
+    const dialogueWithAvatar = document.getElementById('dialogueWithAvatar');
+    if (dialogueWithAvatar) {
+        dialogueWithAvatar.style.display = 'flex'; // 或 'block'，取決於你的布局需求
+    }
+    
     dialogueDisplay.style.backgroundColor = 'white';
     dialogueDisplay.style.border = '1px solid #ddd';
     dialogueDisplay.style.borderRadius = '10px';
@@ -941,6 +951,8 @@ function displayPracticeDetails(practice, nonverbalData) {
 async function createPractice() {
     const technique = techniqueSelect.value;
     const difficulty = difficultySelect.value;
+    // 確保這裡抓到了當前 checkbox 的狀態
+    const nonverbalEnabled = document.getElementById('enableNonverbalDetection').checked;
 
     if (!technique) {
         alert('請先選擇溝通技巧');
@@ -956,7 +968,11 @@ async function createPractice() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ technique, difficulty })
+            body: JSON.stringify({ 
+                technique, 
+                difficulty, 
+                isNonverbalEnabled: nonverbalEnabled // 確保這行有傳給後端儲存
+            })
           });
           const data = await response.json();
           
@@ -1245,6 +1261,7 @@ startRecordBtn.addEventListener('click', async () => {
         if (isNonverbalEnabled && window.nonverbalAnalysis) {
             try {
                 if (!nonverbalAnalysisActive) {
+                    // 只有勾選時才顯示視窗並啟動分析
                     nonverbalWindow.style.display = 'block';
                     await window.nonverbalAnalysis.start();
                     nonverbalAnalysisActive = true;
@@ -1255,6 +1272,9 @@ startRecordBtn.addEventListener('click', async () => {
                 console.error('非語言分析操作失敗:', error);
                 recordStatus.textContent = '警告: 非語言分析失敗,僅記錄語音';
             }
+        } else {
+            // 沒勾選時確保視窗是隱藏的
+            nonverbalWindow.style.display = 'none';
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
