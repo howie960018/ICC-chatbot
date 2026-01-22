@@ -327,10 +327,32 @@
             font-size: 18px;
         }
         
-        /* 對話框容器調整 */
-        #dialogueDisplay {
+        /* 對話容器：包含對話框和輸入區 */
+        .dialogue-container {
             flex: 1;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        
+        /* 對話框樣式 */
+        #dialogueDisplay {
+            flex: 1;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 0 !important;
+            border-bottom-left-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+        }
+        
+        /* 輸入控制區域緊貼對話框 */
+        .dialogue-container .record-controls {
+            margin-top: 0 !important;
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+            border-top: 1px solid #e0e0e0;
         }
         
         /* NPC 角色容器樣式 - 移除背景與陰影 */
@@ -679,7 +701,7 @@
 
                 <!-- 對話與角色並排容器 -->
                 <div class="dialogue-with-avatar" id="dialogueWithAvatar" style="display: none;">
-                    <!-- 📝 NPC 角色動畫面板 -->
+                    <!-- 左側：NPC 角色動畫面板 -->
                     <div id="npcAvatarPanel" class="panel">
                         <h3 style="text-align: center; margin-bottom: 10px;">👤 家長角色</h3>
                         <div class="npc-avatar-container">
@@ -690,30 +712,34 @@
                         <audio id="npcAudioPlayer" style="display: none;"></audio>
                     </div>
 
-                    <div id="dialogueDisplay" class="panel"></div>
-                </div>
+                    <!-- 右側：對話區域容器 -->
+                    <div class="dialogue-container">
+                        <div id="dialogueDisplay" class="panel"></div>
 
-                <div class="record-controls panel">
-                    <div class="input-method-selector" id="inputMethodSelector">
-                        <label>
-                            <input type="radio" name="inputMethod" value="voice" checked> 語音輸入
-                        </label>
-                        <label id="textInputLabel">
-                            <input type="radio" name="inputMethod" value="text"> 文字輸入
-                        </label>
-                    </div>
-                    <div id="voiceInputControls">
-                        <button id="startRecordBtn">開始錄音</button>
-                        <button id="stopRecordBtn" disabled>停止錄音</button>
-                        <div id="countdownDisplay" style="font-size: 1.2em; font-weight: bold; color: red; margin-top: 10px;"></div>
-                        <div class="recording-limit-info">
-                            錄音時間限制: <span class="recording-limit-value">120秒</span>
-                            <span class="recording-tip">* 超過時間限制將自動停止錄音</span>
+                        <!-- 輸入控制區域 -->
+                        <div class="record-controls panel">
+                            <div class="input-method-selector" id="inputMethodSelector">
+                                <label>
+                                    <input type="radio" name="inputMethod" value="voice" checked> 語音輸入
+                                </label>
+                                <label id="textInputLabel">
+                                    <input type="radio" name="inputMethod" value="text"> 文字輸入
+                                </label>
+                            </div>
+                            <div id="voiceInputControls">
+                                <button id="startRecordBtn">開始錄音</button>
+                                <button id="stopRecordBtn" disabled>停止錄音</button>
+                                <div id="countdownDisplay" style="font-size: 1.2em; font-weight: bold; color: red; margin-top: 10px;"></div>
+                                <div class="recording-limit-info">
+                                    錄音時間限制: <span class="recording-limit-value">120秒</span>
+                                    <span class="recording-tip">* 超過時間限制將自動停止錄音</span>
+                                </div>
+                            </div>
+                            <div id="textInputControls" style="display: none;">
+                                <textarea id="textInput" placeholder="請在此輸入您的回應..." rows="4" style="width: 100%; margin-bottom: 10px;"></textarea>
+                                <button id="submitTextBtn">提交文字</button>
+                            </div>
                         </div>
-                    </div>
-                    <div id="textInputControls" style="display: none;">
-                        <textarea id="textInput" placeholder="請在此輸入您的回應..." rows="4" style="width: 100%; margin-bottom: 10px;"></textarea>
-                        <button id="submitTextBtn">提交文字</button>
                     </div>
                 </div>
 

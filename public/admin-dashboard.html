@@ -687,16 +687,19 @@
             const title = document.getElementById('practicesModalTitle');
             const container = document.getElementById('practicesDetails');
 
-            title.textContent = `${username} 的練習紀錄 (共 ${practices.length} 筆)`;
+            // 只顯示有 AI 回饋分析的練習（資料模型中無 `completed` 欄位）
+            const filteredPractices = practices.filter(p => p && p.analysis && p.analysis.toString().trim().length > 0);
 
-            if (practices.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">尚無練習紀錄</p>';
+            title.textContent = `${username} 的練習紀錄 (共 ${filteredPractices.length} 筆)`;
+
+            if (filteredPractices.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">該使用者尚無已完成且含 AI 回饋的練習紀錄</p>';
                 modal.style.display = 'flex';
                 return;
             }
 
             let html = '';
-            practices.forEach((practice, index) => {
+            filteredPractices.forEach((practice, index) => {
                 const createdDate = new Date(practice.createdAt).toLocaleString('zh-TW');
                 const scenarioPreview = practice.scenario?.substring(0, 100) + (practice.scenario?.length > 100 ? '...' : '');
 
@@ -704,7 +707,7 @@
                     <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: white;">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
                             <div>
-                                <h3 style="margin: 0 0 10px 0; color: #2c3e50;">練習 #${practices.length - index}</h3>
+                                <h3 style="margin: 0 0 10px 0; color: #2c3e50;">練習 #${filteredPractices.length - index}</h3>
                                 <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                                     <span class="badge" style="background: #3498db;">${practice.technique || '未指定技巧'}</span>
                                     <span class="badge" style="background: ${practice.difficulty === '簡單' ? '#27ae60' : practice.difficulty === '中等' ? '#f39c12' : '#e74c3c'};">${practice.difficulty || '未指定難度'}</span>
@@ -798,12 +801,12 @@
                             <div style="margin-bottom: 20px;">
                                 <h4 style="color: #2c3e50; margin-bottom: 10px;">🎭 非語言行為分析摘要</h4>
                                 <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; border-left: 4px solid #4caf50;">
-                                    <div><strong>微笑佔比:</strong> ${(practice.nonverbalSummary.averageSmileRatio * 100).toFixed(1)}%</div>
-                                    <div><strong>眼神接觸:</strong> ${(practice.nonverbalSummary.averageEyeContactRatio * 100).toFixed(1)}%</div>
-                                    <div><strong>頭部動作:</strong> ${practice.nonverbalSummary.averageHeadMovement.toFixed(2)}</div>
-                                    <div><strong>手勢活躍度:</strong> ${practice.nonverbalSummary.averageHandGestureActivity.toFixed(2)}</div>
-                                    <div><strong>姿勢穩定度:</strong> ${practice.nonverbalSummary.averagePostureStability.toFixed(2)}</div>
-                                    <div><strong>數據筆數:</strong> ${practice.nonverbalSummary.totalDataPoints}</div>
+                                    <div><strong>微笑佔比:</strong> ${practice.nonverbalSummary.averageSmileRatio !== undefined ? (practice.nonverbalSummary.averageSmileRatio * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                    <div><strong>眼神接觸:</strong> ${practice.nonverbalSummary.averageEyeContactRatio !== undefined ? (practice.nonverbalSummary.averageEyeContactRatio * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                    <div><strong>頭部動作:</strong> ${practice.nonverbalSummary.averageHeadMovement !== undefined ? practice.nonverbalSummary.averageHeadMovement.toFixed(2) : 'N/A'}</div>
+                                    <div><strong>手勢活躍度:</strong> ${practice.nonverbalSummary.averageHandGestureActivity !== undefined ? practice.nonverbalSummary.averageHandGestureActivity.toFixed(2) : 'N/A'}</div>
+                                    <div><strong>姿勢穩定度:</strong> ${practice.nonverbalSummary.averagePostureStability !== undefined ? practice.nonverbalSummary.averagePostureStability.toFixed(2) : 'N/A'}</div>
+                                    <div><strong>數據筆數:</strong> ${practice.nonverbalSummary.totalDataPoints !== undefined ? practice.nonverbalSummary.totalDataPoints : 'N/A'}</div>
                                 </div>
                             </div>
                             ` : ''}

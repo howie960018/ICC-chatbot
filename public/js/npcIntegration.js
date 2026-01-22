@@ -25,7 +25,10 @@ class NPCAvatarController {
                 idle: '/assets/mother-idle.png',
                 talkFrames: [
                     '/assets/mother-talk1.png',
-                    '/assets/mother-talk2.png'
+                    '/assets/mother-talk2.png',
+                    '/assets/mother-talk3.png',
+                    '/assets/mother-talk4.png',
+                    '/assets/mother-talk5.png'
                 ],
                 voice: 'nova'  // OpenAI TTS 女聲
             },
@@ -45,7 +48,7 @@ class NPCAvatarController {
         this.images = this.characterSets.mother;
         
         // 動畫設定
-        this.frameInterval = 150; // 每150ms切換一次圖片
+        this.frameInterval = 120; // 每120ms切換一次圖片（更流暢）
         this.currentFrame = 0;
         
         // 綁定音訊事件
