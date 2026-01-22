@@ -235,6 +235,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 800);
 });
 
+// 監聽角色選擇變更 - 即時預覽
+document.addEventListener('DOMContentLoaded', () => {
+    const characterSelect = document.getElementById('characterSelect');
+    if (characterSelect) {
+        characterSelect.addEventListener('change', (e) => {
+            const selectedCharacter = e.target.value;
+            if (window.npcAvatarController) {
+                // 1. 設定角色圖片
+                window.npcAvatarController.setCharacter(selectedCharacter);
+                // 2. 關鍵修正：強制顯示面板，這樣才看得到圖片切換
+                window.npcAvatarController.show(); 
+                
+                console.log('✅ 預覽角色已切換為:', selectedCharacter);
+            }
+        });
+    }
+});
+
 // 定期檢查 token
 setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 
@@ -1041,6 +1059,7 @@ async function startDialogue(practiceId, specifiedScenario = null) {
         dialogueCount = 0; 
 
         if (!technique) throw new Error('請選擇溝通技巧');
+        const characterVoice = getSelectedCharacterVoice();
 
         const response = await fetch('/api/dialogue/start-dialogue', {
             method: 'POST',
@@ -1052,7 +1071,8 @@ async function startDialogue(practiceId, specifiedScenario = null) {
                 technique,
                 difficulty,
                 practiceId,
-                specifiedScenario
+                specifiedScenario,
+                characterVoice 
             }),
         });
 
@@ -1152,6 +1172,9 @@ async function handleSubmission(text) {
             }
         }
 
+        const characterVoice = getSelectedCharacterVoice();
+        console.log('使用角色語音:', characterVoice);
+
         const response = await fetch('/api/dialogue/continue-dialogue', {
             method: 'POST',
             headers: {
@@ -1163,7 +1186,8 @@ async function handleSubmission(text) {
                 practiceId: currentPracticeId,
                 challengeTimeOver: false,
                 inputMethod: document.querySelector('input[name="inputMethod"]:checked').value,
-                nonverbalData: nonverbalData
+                nonverbalData: nonverbalData,
+                characterVoice: getSelectedCharacterVoice()
             })
         });
 
@@ -1388,6 +1412,14 @@ startPracticeBtn.addEventListener('click', async () => {
             if(countdownDisplay) countdownDisplay.style.display = 'none';
         } else if (difficulty === '挑戰') {
             if(countdownDisplay) countdownDisplay.style.display = 'block';
+        }
+
+        // 📝 新增：設置選擇的角色
+        const characterSelect = document.getElementById('characterSelect');
+        if (characterSelect && window.npcAvatarController) {
+            const selectedCharacter = characterSelect.value;
+            window.npcAvatarController.setCharacter(selectedCharacter);
+            console.log('已設置NPC角色為:', selectedCharacter);
         }
 
         enableUserInput();
@@ -1691,6 +1723,8 @@ function resetCountdown() {
     }
 }
 
+
+
 async function handleChallengeEnd() {
     try {
         disableUserInput();
@@ -1717,7 +1751,8 @@ async function handleChallengeEnd() {
             body: JSON.stringify({
                 userResponse: "", 
                 practiceId: currentPracticeId,
-                challengeTimeOver: true
+                challengeTimeOver: true,
+                
             })
         });
 
@@ -1735,6 +1770,23 @@ async function handleChallengeEnd() {
         console.error('挑戰模式結束時發生錯誤:', error);
         recordStatus.textContent = '分析失敗，請重試';
     }
+}
+
+function getSelectedCharacterVoice() {
+    const characterSelect = document.getElementById('characterSelect');
+    if (!characterSelect) {
+        return 'nova'; // 默認使用女聲
+    }
+    
+    const selectedCharacter = characterSelect.value;
+    
+    // 角色與語音的映射
+    const voiceMap = {
+        'mother': 'nova',   // 媽媽 - 女聲（溫暖）
+        'father': 'onyx'    // 爸爸 - 男聲（沉穩）
+    };
+    
+    return voiceMap[selectedCharacter] || 'nova';
 }
 
 async function handleDialogueEnd(practiceId, analysis) {
