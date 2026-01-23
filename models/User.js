@@ -47,6 +47,10 @@ const UserSchema = new mongoose.Schema({
         type: String, // 溝通技巧名稱
         required: [true, '溝通技巧為必填']
       },
+      isNonverbalEnabled: {
+        type: Boolean,
+        default: false
+      },
       history: [
         {
           role: {

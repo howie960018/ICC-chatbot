@@ -672,6 +672,8 @@ async function loadPracticeDetails(practiceId) {
 
 // 顯示練習詳情與分析
 function displayPracticeDetails(practice, nonverbalData) {
+
+
     const techniqueDisplay = document.getElementById('scenarioDisplay');
 
     techniqueDisplay.innerHTML = `
@@ -717,8 +719,21 @@ function displayPracticeDetails(practice, nonverbalData) {
     const nonverbalDisplayPanel = document.getElementById('nonverbalDataDisplay');
     const nonverbalDataContent = document.getElementById('nonverbalDataContent');
 
+    //檢查是否真的有「非 0」的有效數據
+    // 遍歷每一輪對話 (details)，只要有任何一輪的任何一個指標大於 0，就視為有效。
+    const hasValidData = nonverbalData && Array.isArray(nonverbalData.details) && nonverbalData.details.some(d => {
+        const n = d.nonverbalData || {};
+        // 檢查是否有任何數值 > 0 (眼神、微笑、姿態、手勢)
+        return (n.eyeContactRate > 0) || 
+               (n.smileRate > 0) || 
+               (n.openPostureRate > 0) ;
+    });
+
     // 修改判斷邏輯：只有在「後端有數據」且「該練習紀錄標記為已啟用非語言偵測」時才顯示
-    if (nonverbalData && nonverbalData.hasNonverbalData && Array.isArray(nonverbalData.details) && practice.isNonverbalEnabled) {
+    if (nonverbalData && 
+        nonverbalData.hasNonverbalData && 
+        Array.isArray(nonverbalData.details) && 
+        hasValidData){
         // 顯示非語言數據面板
         nonverbalDisplayPanel.style.display = 'block';
 
