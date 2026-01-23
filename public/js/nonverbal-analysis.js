@@ -1,6 +1,5 @@
 // 非語言分析模組
 import {
-    GestureRecognizer,
     FilesetResolver
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
@@ -24,11 +23,9 @@ const panelPose = document.getElementById('hud-pose');
 
 // 全域變數
 let isRunning = false;
-let gestureRecognizer;
 let holistic;
 let camera;
 let lastVideoTime = -1;
-let lastGestureTime = 0;
 
 // 非語言數據收集
 let nonverbalData = {
@@ -56,19 +53,6 @@ async function initNonverbalAnalysis() {
     console.log('開始初始化非語言分析模型...');
 
     try {
-        // 初始化 Gesture Recognizer
-        const vision = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-        );
-        gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
-                delegate: "GPU"
-            },
-            runningMode: "VIDEO"
-        });
-        console.log('✅ Gesture Recognizer 初始化完成');
-
         // 初始化 Holistic
         holistic = new Holistic({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`
@@ -119,6 +103,17 @@ async function startNonverbalAnalysis() {
         console.log('Video element:', videoElement);
         console.log('Holistic:', holistic);
 
+        // 如果camera已經存在,先停止它再重新創建
+        if (camera) {
+            console.log('檢測到現有camera,正在停止...');
+            try {
+                camera.stop();
+            } catch (e) {
+                console.warn('停止舊camera時出錯:', e);
+            }
+            camera = null;
+        }
+
         camera = new Camera(videoElement, {
             onFrame: async () => {
                 if (!isRunning) return;
@@ -130,12 +125,6 @@ async function startNonverbalAnalysis() {
                 }
 
                 await holistic.send({ image: videoElement });
-
-                let now = Date.now();
-                if (now - lastGestureTime > 150) {
-                    predictGesture();
-                    lastGestureTime = now;
-                }
             },
             width: 1280,
             height: 720
@@ -184,10 +173,17 @@ function resetCurrentData() {
 
 // 停止非語言分析
 function stopNonverbalAnalysis() {
+    console.log('停止非語言分析...');
     isRunning = false;
 
     if (camera) {
-        camera.stop();
+        try {
+            camera.stop();
+            console.log('✅ Camera已停止');
+        } catch (e) {
+            console.warn('停止camera時出錯:', e);
+        }
+        camera = null; // 清空camera引用
     }
 
     if (nonverbalWindow) {
@@ -196,43 +192,6 @@ function stopNonverbalAnalysis() {
 
     // 返回收集的非語言數據
     return getNonverbalSummary();
-}
-
-// 手勢識別
-function predictGesture() {
-    if (!gestureRecognizer || !videoElement) return;
-
-    if (videoElement.currentTime !== lastVideoTime) {
-        lastVideoTime = videoElement.currentTime;
-        const results = gestureRecognizer.recognizeForVideo(videoElement, Date.now());
-
-        if (results.gestures.length > 0) {
-            const category = results.gestures[0][0];
-            const name = category.categoryName;
-            const score = category.score;
-
-            if (score > 0.5 && name !== "None") {
-                let display = name;
-                if (name === "Thumb_Up") display = "讚 👍";
-                if (name === "Victory") display = "勝利 ✌️";
-                if (name === "Open_Palm") display = "開放手掌 ✋";
-                if (name === "Closed_Fist") display = "握拳 ✊";
-                if (name === "Pointing_Up") display = "指向 ☝️";
-
-                elHandVal.innerText = display;
-                elHandVal.style.color = "#00b894";
-
-                // 記錄手勢
-                nonverbalData.gestures.push({ name, timestamp: Date.now() });
-            } else {
-                elHandVal.innerText = "無";
-                elHandVal.style.color = "white";
-            }
-        } else {
-            elHandVal.innerText = "無";
-            elHandVal.style.color = "white";
-        }
-    }
 }
 
 // Holistic 結果處理
@@ -378,8 +337,8 @@ function getNonverbalSummary() {
         eyeContactRate: parseFloat(eyeContactRate),
         smileRate: parseFloat(smileRate),
         openPostureRate: parseFloat(openPostureRate),
-        gesturesUsed: nonverbalData.gestures.length,
-        gesturesList: nonverbalData.gestures,
+        gesturesUsed: 0,
+        gesturesList: [],
 
         // 原始統計數據
         rawData: {

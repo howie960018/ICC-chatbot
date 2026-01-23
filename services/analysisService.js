@@ -340,17 +340,17 @@ function generateDefaultPrompt(conversationHistory, nonverbalData = null) {
   if (nonverbalData) {
     nonverbalSection = `
 
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 
     【非語言行為數據】(基於 ${nonverbalData.sampleCount || 1} 次對話的平均值)
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    📊 統計數據:
+   
+    統計數據:
     - 眼神接觸率: ${nonverbalData.eyeContactRate}% ${nonverbalData.eyeContactRate >= 70 ? '✅ 良好' : nonverbalData.eyeContactRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
     - 微笑率: ${nonverbalData.smileRate}% ${nonverbalData.smileRate >= 60 ? '✅ 良好' : nonverbalData.smileRate >= 40 ? '⚠️ 普通' : '❌ 需改進'}
     - 開放姿態率: ${nonverbalData.openPostureRate}% ${nonverbalData.openPostureRate >= 70 ? '✅ 良好' : nonverbalData.openPostureRate >= 50 ? '⚠️ 普通' : '❌ 需改進'}
-    - 手勢使用次數: ${nonverbalData.gesturesUsed} 次
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    ⚠️ 重要：請務必在分析中納入非語言行為評估和語音表達建議。`;
+   
+
+    ⚠️請務必在分析中納入非語言行為評估和語音表達建議。`;
   }
 
   return `分析整段對話，針對導師的回應，指出導師的表現以及如何改進。不用分析家長的，請開始分析：${nonverbalSection}

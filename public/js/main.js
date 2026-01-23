@@ -677,43 +677,129 @@ function displayPracticeDetails(practice, nonverbalData) {
     const techniqueDisplay = document.getElementById('scenarioDisplay');
 
     techniqueDisplay.innerHTML = `
-        <p><strong>⭐ 溝通技巧：</strong>${practice.technique}</p>
+        <p><strong>溝通技巧：</strong>${practice.technique}</p>
         <p><strong>模式：</strong>${practice.difficulty || '簡單'}</p>
-        <p><strong>📖 情境：</strong>${practice.scenario}</p>
+        <p><strong>情境：</strong>${practice.scenario}</p>
     `;
 
     analysisContent.innerHTML = '';
     
-    // 顯示語言分析
-    if (practice.analysis) {
-        const paragraphs = practice.analysis.split(/(?<=。)\s/);
-        paragraphs.forEach(paragraph => {
-            const cleanedParagraph = paragraph.replace(/[#*]/g, '').replace(/-/g, '').trim();
-            const paragraphElement = document.createElement('p');
-            
-            let content = cleanedParagraph
-                .replace(/整體回饋：/g, '<strong>整體回饋：</strong>')
-                .replace(/具體描述對方行為：/g, '<strong>具體描述對方行為：</strong>');
-            
-            content = content.replace(/(\d+)/g, '<br>$1');
-            
-            const subtitleMatch = content.match(/^(.*?：)/);
-            if (subtitleMatch) {
-                const subtitle = subtitleMatch[1];
-                content = content.replace(subtitle, '').trim();
-                content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
-                content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
-                paragraphElement.innerHTML = `<strong>${subtitle}</strong>${content}`;
-            } else {
-                content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
-                content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
-                paragraphElement.innerHTML = content;
-            }
-            analysisContent.appendChild(paragraphElement);
-        });
+    // 檢查練習是否已結束（有分析結果代表已結束）
+    const practiceCompleted = !!practice.analysis;
+    
+    // 控制分析結果框框的顯示
+    const analysisDisplay = document.getElementById('analysisDisplay');
+    if (practiceCompleted) {
+        // 練習結束，顯示分析結果框框
+        if (analysisDisplay) {
+            analysisDisplay.style.display = 'block';
+        }
     } else {
-        analysisContent.textContent = '尚無分析結果';
+        // 練習進行中，隱藏分析結果框框
+        if (analysisDisplay) {
+            analysisDisplay.style.display = 'none';
+        }
     }
+    
+    // 如果練習已結束，隱藏整個 record-controls panel
+    if (practiceCompleted) {
+        const recordControlsPanel = document.querySelector('.record-controls.panel');
+        if (recordControlsPanel) {
+            recordControlsPanel.style.display = 'none';
+        }
+    } else {
+        // 如果練習進行中，確保 record-controls panel 顯示
+        const recordControlsPanel = document.querySelector('.record-controls.panel');
+        if (recordControlsPanel) {
+            recordControlsPanel.style.display = 'block';
+        }
+    }
+    
+    // 顯示語言分析
+        if (practice.analysis) {
+            // 1. 基礎清理：移除裝飾線
+            let rawContent = practice.analysis.replace(/━+/g, '').trim();
+
+            // 2. ✨ 關鍵修正 A：移除評分的中括號 (例如 [D] -> D)
+            rawContent = rawContent.replace(/\[([A-Z])\]/g, '$1');
+
+            // 3. ✨ 關鍵修正 B：修復統計數據的斷行 (將 "- \n 眼神" 接回成 "- 眼神")
+            // 這會抓取 "-" 後面跟著換行符號，再接著關鍵字的情況，把中間的換行拿掉
+            rawContent = rawContent.replace(/-\s*[\r\n]+\s*(眼神接觸率|微笑率|開放姿態率|手勢使用次數)/g, '- $1');
+
+            // 4. 切分每一行
+            const lines = rawContent.split('\n').filter(line => line.trim() !== '');
+
+            lines.forEach(line => {
+                let text = line.trim();
+                if (!text) return;
+
+                const paragraphElement = document.createElement('div');
+                paragraphElement.style.marginBottom = '6px'; // 微調行距
+                paragraphElement.style.lineHeight = '1.6';
+
+                // (A) 處理標題 (對話分析、統計數據等)
+                if (text.match(/^(對話分析|具體修正建議|整體回饋|統計數據)[：:]?/)) {
+                    // 加上左邊框裝飾，讓標題更明顯
+                    paragraphElement.innerHTML = `<h4 style="margin: 15px 0 8px 0; color: #333; border-left: 4px solid #e93ae1; padding-left: 10px;">${text}</h4>`;
+                }
+                // (B) 處理統計數據列表 (以 - 開頭的行)
+                else if (text.startsWith('-') && (text.includes('眼神') || text.includes('微笑') || text.includes('姿態') || text.includes('手勢'))) {
+                    // 加粗關鍵字 (冒號前的部分)
+                    text = text.replace(/^(.*?):/, '<strong>$1</strong>:');
+                    paragraphElement.innerHTML = `<div style="padding-left: 10px; color: #444;">${text}</div>`;
+                }
+                // (C) 處理評分項目 (例如：情感表現：D)
+                else if (text.match(/^(情感表現|內容回應|清晰表達|溝通技巧)[：:]/)) {
+                    // 加粗關鍵字，確保呈現為 "項目：分數"
+                    text = text.replace(/^(.*?)[：:]\s*(.*)/, '<strong>$1：</strong>$2');
+                    paragraphElement.innerHTML = text;
+                }
+                // (D) 處理數字列表 (1. xxx)
+                else if (text.match(/^\d+\./)) {
+                    text = text.replace(/^(\d+\.)/, '<strong>$1</strong>');
+                    paragraphElement.innerHTML = `<div style="padding-left: 10px;">${text}</div>`;
+                }
+                // (E) 一般文字
+                else {
+                    paragraphElement.innerHTML = text;
+                }
+
+                analysisContent.appendChild(paragraphElement);
+            });
+
+        } else {
+            analysisContent.textContent = '尚無分析結果';
+        }
+    // if (practice.analysis) {
+    //     const paragraphs = practice.analysis.split(/(?<=。)\s/);
+    //     paragraphs.forEach(paragraph => {
+    //         const cleanedParagraph = paragraph.replace(/[#*]/g, '').replace(/-/g, '').trim();
+    //         const paragraphElement = document.createElement('p');
+            
+    //         let content = cleanedParagraph
+    //             .replace(/整體回饋：/g, '<strong>整體回饋：</strong>')
+    //             .replace(/具體描述對方行為：/g, '<strong>具體描述對方行為：</strong>');
+            
+    //         content = content.replace(/(\d+)/g, '<br>$1');
+            
+    //         const subtitleMatch = content.match(/^(.*?：)/);
+    //         if (subtitleMatch) {
+    //             const subtitle = subtitleMatch[1];
+    //             content = content.replace(subtitle, '').trim();
+    //             content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
+    //             content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
+    //             paragraphElement.innerHTML = `<strong>${subtitle}</strong>${content}`;
+    //         } else {
+    //             content = content.replace(/\)(.*?)/g, ')<br><strong>$1</strong>');
+    //             content = content.replace(/(\d+\s*.*?):/g, '<strong>$1</strong>:');
+    //             paragraphElement.innerHTML = content;
+    //         }
+    //         analysisContent.appendChild(paragraphElement);
+    //     });
+    // } else {
+    //     analysisContent.textContent = '尚無分析結果';
+    // }
 
     // 顯示非語言分析
     const nonverbalDisplayPanel = document.getElementById('nonverbalDataDisplay');
@@ -729,8 +815,9 @@ function displayPracticeDetails(practice, nonverbalData) {
                (n.openPostureRate > 0) ;
     });
 
-    // 修改判斷邏輯：只有在「後端有數據」且「該練習紀錄標記為已啟用非語言偵測」時才顯示
-    if (nonverbalData && 
+    // 修改判斷邏輯：只有在「練習完全結束」且「後端有數據」且「該練習紀錄標記為已啟用非語言偵測」時才顯示
+    if (practiceCompleted && 
+        nonverbalData && 
         nonverbalData.hasNonverbalData && 
         Array.isArray(nonverbalData.details) && 
         hasValidData){
@@ -939,26 +1026,40 @@ function displayPracticeDetails(practice, nonverbalData) {
         });
     }
 
-    // 重新練習按鈕
+    // 重新練習按鈕 - 放在最下面
     const existingRetryContainer = document.querySelector('.retry-button-container');
     if (existingRetryContainer) existingRetryContainer.remove();
     
     const retryButtonContainer = document.createElement('div');
     retryButtonContainer.className = 'retry-button-container';
+    retryButtonContainer.style.textAlign = 'center';
+    retryButtonContainer.style.marginTop = '30px';
     
     const retryButton = document.createElement('button');
     retryButton.textContent = '重新練習';
     retryButton.className = 'retry-main-btn';
+    // 加大按鈕和字體
+    retryButton.style.fontSize = '20px';
+    retryButton.style.padding = '15px 40px';
+    retryButton.style.fontWeight = 'bold';
     retryButton.addEventListener('click', async () => {
         await retryPractice(practice._id, practice.scenario);
     });
     
     retryButtonContainer.appendChild(retryButton);
-    const analysisDisplay = document.getElementById('analysisDisplay');
-    if (analysisDisplay.nextSibling) {
-        analysisDisplay.parentNode.insertBefore(retryButtonContainer, analysisDisplay.nextSibling);
+    
+    // 決定放置位置：如果有非語言分析區塊且顯示中，就放在它後面；否則放在分析結果框框後面
+    let insertAfterElement;
+    if (nonverbalDisplayPanel && nonverbalDisplayPanel.style.display !== 'none') {
+        insertAfterElement = nonverbalDisplayPanel;
     } else {
-        analysisDisplay.parentNode.appendChild(retryButtonContainer);
+        insertAfterElement = analysisDisplay;
+    }
+    
+    if (insertAfterElement.nextSibling) {
+        insertAfterElement.parentNode.insertBefore(retryButtonContainer, insertAfterElement.nextSibling);
+    } else {
+        insertAfterElement.parentNode.appendChild(retryButtonContainer);
     }
 }
 
@@ -1440,6 +1541,35 @@ startPracticeBtn.addEventListener('click', async () => {
         clearAnalysis();
         resetCountdown();
 
+        // 顯示 record-controls panel（新練習開始時）
+        const recordControlsPanel = document.querySelector('.record-controls.panel');
+        if (recordControlsPanel) {
+            recordControlsPanel.style.display = 'block';
+        }
+
+        // 清空上一次練習的非語言分析結果面板
+        const nonverbalDisplayPanel = document.getElementById('nonverbalDataDisplay');
+        if (nonverbalDisplayPanel) {
+            nonverbalDisplayPanel.style.display = 'none';
+            const nonverbalDataContent = document.getElementById('nonverbalDataContent');
+            if (nonverbalDataContent) {
+                nonverbalDataContent.innerHTML = '';
+            }
+        }
+
+        // 重置非語言分析狀態,確保下次可以正常啟動
+        if (isNonverbalEnabled && window.nonverbalAnalysis) {
+            if (nonverbalAnalysisActive) {
+                try {
+                    window.nonverbalAnalysis.stop();
+                    console.log('✅ 已停止上一次練習的非語言分析');
+                } catch (e) {
+                    console.warn('停止非語言分析時出錯:', e);
+                }
+                nonverbalAnalysisActive = false;
+            }
+        }
+
         const difficulty = difficultySelect.value;
         const countdownDisplay = document.getElementById('countdownDisplay');
 
@@ -1768,7 +1898,8 @@ async function handleChallengeEnd() {
         if (isNonverbalEnabled && window.nonverbalAnalysis) {
             try {
                 window.nonverbalAnalysis.stop();
-                console.log('✅ 挑戰模式結束，已停止非語言分析');
+                nonverbalAnalysisActive = false; // 重置狀態
+                console.log('✅ 挑戰模式結束，已停止非語言分析並重置狀態');
             } catch (error) {
                 console.error('停止非語言分析失敗:', error);
             }
@@ -1828,6 +1959,8 @@ async function handleDialogueEnd(practiceId, analysis) {
     if (isNonverbalEnabled && window.nonverbalAnalysis) {
         try {
             window.nonverbalAnalysis.stop();
+            nonverbalAnalysisActive = false; // 重置狀態
+            console.log('✅ 對話結束,已停止非語言分析並重置狀態');
         } catch (error) {
             console.error('停止非語言分析失敗:', error);
         }
