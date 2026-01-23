@@ -190,7 +190,11 @@
             
             #npcAvatarPanel {
                 width: 100%;
-                min-width: unset;
+                max-width: 100%;
+            }
+            
+            .npc-avatar-container {
+                height: 220px;
             }
         }
 
@@ -301,36 +305,39 @@
             box-shadow: 0 0 8px rgba(233, 58, 225, 0.5);
         }
         
-        /* 對話與角色並排容器 */
+        /* 對話與角色並排容器 - 改為垂直布局 */
         .dialogue-with-avatar {
             display: flex;
-            gap: 20px;
-            align-items: flex-start;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
         }
         
-        /* NPC 面板樣式調整 - 移除白色背景與邊框 */
+        /* NPC 面板樣式調整 - 放大並居中 */
         #npcAvatarPanel {
-            flex-shrink: 0;
-            width: 250px;
-            min-width: 250px;
+            width: 400px;
+            max-width: 90%;
+            margin: 0 auto;
         }
         
         #npcAvatarPanel.panel {
-            background-color: transparent; /* 移除白色背景 */
-            border: none;                  /* 移除邊框 */
-            box-shadow: none;              /* 移除陰影 */
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 2px solid #ffffff;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
         }
         
         #npcAvatarPanel h3 {
             margin-top: 0;
-            color: #333; /* 確保在透明背景下顏色清晰 */
-            font-size: 18px;
+            color: #000000;
+            font-size: 20px;
+            text-align: center;
         }
         
         /* 對話容器：包含對話框和輸入區 */
         .dialogue-container {
-            flex: 1;
-            min-width: 0;
+            width: 100%;
             display: flex;
             flex-direction: column;
             gap: 0;
@@ -347,6 +354,33 @@
             border-bottom-right-radius: 0 !important;
         }
         
+        /* RPG風格對話框 - 練習進行中 */
+        #dialogueDisplay.rpg-mode {
+            min-height: 150px;
+            max-height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        #dialogueDisplay.rpg-mode .message {
+            animation: slideInFromBottom 0.5s ease-out;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            max-width: 100%;
+        }
+        
+        @keyframes slideInFromBottom {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+        
         /* 輸入控制區域緊貼對話框 */
         .dialogue-container .record-controls {
             margin-top: 0 !important;
@@ -355,22 +389,25 @@
             border-top: 1px solid #e0e0e0;
         }
         
-        /* NPC 角色容器樣式 - 移除背景與陰影 */
+        /* NPC 角色容器樣式 - 只顯示角色圖片 */
         .npc-avatar-container {
             position: relative;
             width: 100%;
-            height: fit-content; /* 改為根據內容縮放 */
+            height: 450px;
             margin: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: transparent;       /* 移除漸層背景 */
-            border-radius: 15px;
-            box-shadow: none;              /* 移除陰影 */
-            padding: 0;                    /* 移除內邊距 */
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
+            overflow: hidden;
         }
         
         .npc-avatar-container img {
+            width: 90%;
+            height: 90%;
             max-width: 100%;
             max-height: 100%;
             image-rendering: pixelated;
@@ -678,11 +715,11 @@
 
                     <div style="margin: 10px 0;">
                         <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #333;">
-                            👥 家長角色：
+                            家長角色：
                         </label>
                         <select id="characterSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; background: white; cursor: pointer;">
-                            <option value="mother">👩 媽媽（溫暖女聲）</option>
-                            <option value="father">👨 爸爸（沉穩男聲）</option>
+                            <option value="mother">媽媽（溫暖女聲）</option>
+                            <option value="father">爸爸（沉穩男聲）</option>
                         </select>
                     </div>
                     <div style="margin: 10px 0;">
@@ -699,20 +736,19 @@
 
                 <div id="scenarioDisplay" class="panel"></div>
 
-                <!-- 對話與角色並排容器 -->
+                <!-- 對話與角色垂直排列容器 -->
                 <div class="dialogue-with-avatar" id="dialogueWithAvatar" style="display: none;">
-                    <!-- 左側：NPC 角色動畫面板 -->
+                    <!-- 上方：NPC 角色動畫面板 -->
                     <div id="npcAvatarPanel" class="panel">
-                        <h3 style="text-align: center; margin-bottom: 10px;">👤 家長角色</h3>
+                        <h3 style="margin-bottom: 15px;">👤 家長角色</h3>
                         <div class="npc-avatar-container">
                             <div class="npc-status-indicator" id="npcStatusIndicator"></div>
-                          
                             <img id="npcAvatar" src="" alt="家長角色">
                         </div>
                         <audio id="npcAudioPlayer" style="display: none;"></audio>
                     </div>
 
-                    <!-- 右側：對話區域容器 -->
+                    <!-- 下方：對話區域容器 -->
                     <div class="dialogue-container">
                         <div id="dialogueDisplay" class="panel"></div>
 
@@ -747,7 +783,7 @@
                 <div id="recordStatus" class="status"></div>
                 <div id="audioPlayback" class="audio-playback" style="display: none;"></div>
 
-                <div id="analysisDisplay" class="panel">
+                <div id="analysisDisplay" class="panel" style="display: none;">
                     <h3>分析結果</h3>
                     <div id="analysisContent"></div>
                 </div>

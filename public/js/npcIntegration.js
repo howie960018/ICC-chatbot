@@ -263,24 +263,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
 });
 // ==========================================
+// RPG 風格對話管理
+// ==========================================
+
+// 儲存完整對話記錄
+let fullDialogueHistory = [];
+let isInPracticeMode = false;
+
+// ==========================================
 // 覆蓋原有的 updateDialogueDisplay 函數
 // ==========================================
 
 const originalUpdateDialogueDisplay = window.updateDialogueDisplay;
 
 window.updateDialogueDisplay = function(speaker, message, audioFilePath = null) {
-    if (typeof originalUpdateDialogueDisplay === 'function') {
-        originalUpdateDialogueDisplay(speaker, message, audioFilePath);
-    }
+    // 儲存到完整對話記錄
+    fullDialogueHistory.push({
+        speaker: speaker,
+        message: message,
+        audioFilePath: audioFilePath,
+        timestamp: new Date()
+    });
     
+    const dialogueDisplay = document.getElementById('dialogueDisplay');
     const speakerType = speaker.toLowerCase() === 'teacher' || speaker === '老師' ? '老師' : '家長';
     
+    // 判斷是否在練習模式中
+    if (isInPracticeMode && dialogueDisplay) {
+        // RPG 風格：只顯示最新消息
+        dialogueDisplay.classList.add('rpg-mode');
+        dialogueDisplay.innerHTML = ''; // 清空舊內容
+        
+        // 創建新消息元素
+        const messageDiv = createMessageElement(speaker, message, audioFilePath, speakerType);
+        dialogueDisplay.appendChild(messageDiv);
+        
+    } else {
+        // 完整記錄模式：調用原始函數
+        if (typeof originalUpdateDialogueDisplay === 'function') {
+            originalUpdateDialogueDisplay(speaker, message, audioFilePath);
+        }
+    }
+    
+    // 家長回應時觸發 NPC 動畫
     if (speakerType === '家長' && audioFilePath && npcAvatarController) {
         console.log('🎭 家長回應，觸發NPC動畫');
         npcAvatarController.show();
         npcAvatarController.playAudioWithAnimation(audioFilePath);
     }
 };
+
+// 創建消息元素的輔助函數
+function createMessageElement(speaker, message, audioFilePath, speakerType) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${speakerType}`;
+    
+    const icon = speakerType === '老師' ? '👩‍🏫' : '👤';
+    const alignment = speakerType === '老師' ? 'right' : 'left';
+    
+    messageDiv.innerHTML = `
+        <div class="message-header" style="text-align: ${alignment}; font-weight: bold; margin-bottom: 5px;">
+            ${icon} ${speakerType}
+        </div>
+        <div class="message-content" style="font-size: 1.1em;">
+            ${message}
+            ${audioFilePath ? `
+                <button class="play-audio-btn" onclick="playAudio('${audioFilePath}')" title="播放語音">
+                    🔊 播放
+                </button>
+            ` : ''}
+        </div>
+        <div class="message-time" style="text-align: ${alignment}; font-size: 0.85em; opacity: 0.7; margin-top: 5px;">
+            ${new Date().toLocaleTimeString()}
+        </div>
+    `;
+    
+    return messageDiv;
+}
+
+// 顯示完整對話記錄
+function showFullDialogueHistory() {
+    const dialogueDisplay = document.getElementById('dialogueDisplay');
+    if (!dialogueDisplay) return;
+    
+    dialogueDisplay.classList.remove('rpg-mode');
+    dialogueDisplay.innerHTML = '';
+    
+    fullDialogueHistory.forEach(item => {
+        const speakerType = item.speaker.toLowerCase() === 'teacher' || item.speaker === '老師' ? '老師' : '家長';
+        const messageDiv = createMessageElement(item.speaker, item.message, item.audioFilePath, speakerType);
+        dialogueDisplay.appendChild(messageDiv);
+    });
+    
+    // 滾動到底部 - 已停用，讓用戶自行控制
+    // dialogueDisplay.scrollTop = dialogueDisplay.scrollHeight;
+}
 
 // ==========================================
 // 覆蓋原有的 playAudio 函數
@@ -321,6 +398,16 @@ document.addEventListener('practiceStarted', () => {
         npcAvatarController.reset();
         console.log('🎬 練習開始，顯示NPC角色');
     }
+    
+    // 進入練習模式（RPG風格）
+    isInPracticeMode = true;
+    fullDialogueHistory = []; // 清空對話記錄
+    
+    const dialogueDisplay = document.getElementById('dialogueDisplay');
+    if (dialogueDisplay) {
+        dialogueDisplay.classList.add('rpg-mode');
+        dialogueDisplay.innerHTML = '';
+    }
 });
 
 document.addEventListener('practiceEnded', () => {
@@ -330,6 +417,14 @@ document.addEventListener('practiceEnded', () => {
             console.log('🏁 練習結束，停止NPC音訊');
         }, 1000);
     }
+    
+    // 退出練習模式，顯示完整對話記錄
+    isInPracticeMode = false;
+    
+    setTimeout(() => {
+        showFullDialogueHistory();
+        console.log('📜 顯示完整對話記錄');
+    }, 1500);
 });
 
 // ==========================================
@@ -367,4 +462,19 @@ window.testCharacterSwitch = function(characterType) {
     }
 };
 
-console.log('✅ NPC動畫整合腳本 v2.0 已載入（支持多角色）');
+// 新增：手動切換對話顯示模式
+window.toggleDialogueMode = function() {
+    isInPracticeMode = !isInPracticeMode;
+    if (isInPracticeMode) {
+        const dialogueDisplay = document.getElementById('dialogueDisplay');
+        if (dialogueDisplay) {
+            dialogueDisplay.classList.add('rpg-mode');
+        }
+        console.log('🎮 切換到 RPG 模式');
+    } else {
+        showFullDialogueHistory();
+        console.log('📜 切換到完整記錄模式');
+    }
+};
+
+console.log('✅ NPC動畫整合腳本 v2.0 已載入（支持多角色 + RPG對話風格）');

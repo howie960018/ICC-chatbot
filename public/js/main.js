@@ -842,10 +842,6 @@ function displayPracticeDetails(practice, nonverbalData) {
                         <div style="font-size: 14px; opacity: 0.9;">開放姿態率</div>
                         <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.averageOpenPostureRate}%</div>
                     </div>
-                    <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 10px; color: white;">
-                        <div style="font-size: 14px; opacity: 0.9;">總手勢次數</div>
-                        <div style="font-size: 32px; font-weight: bold; margin-top: 5px;">${nonverbalData.summary.totalGesturesUsed}</div>
-                    </div>
                 </div>
             `;
         }
@@ -871,7 +867,6 @@ function displayPracticeDetails(practice, nonverbalData) {
                                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">眼神接觸</th>
                                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">微笑</th>
                                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">姿態</th>
-                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">手勢</th>
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">品質</th>
                             </tr>
                         </thead>
@@ -890,10 +885,6 @@ function displayPracticeDetails(practice, nonverbalData) {
                 return `<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${rate}%</span>`;
             };
 
-            const gestures = d.nonverbalData.gesturesList && d.nonverbalData.gesturesList.length > 0
-                ? d.nonverbalData.gesturesList.map(g => g.name).join(', ')
-                : '無';
-
             const quality = d.nonverbalData.dataQuality
                 ? `${d.nonverbalData.dataQuality.sampleCount} 幀 / ${d.nonverbalData.dataQuality.faceDetectionRate}% 偵測率`
                 : '-';
@@ -905,7 +896,6 @@ function displayPracticeDetails(practice, nonverbalData) {
                     <td style="padding: 12px; text-align: center;">${getRateBadge(eyeRate)}</td>
                     <td style="padding: 12px; text-align: center;">${getRateBadge(smileRate)}</td>
                     <td style="padding: 12px; text-align: center;">${getRateBadge(postureRate)}</td>
-                    <td style="padding: 12px; text-align: center;">${d.nonverbalData.gesturesUsed ?? 0}</td>
                     <td style="padding: 12px; font-size: 12px; color: #666;">${quality}</td>
                 </tr>
             `;
@@ -1541,6 +1531,12 @@ startPracticeBtn.addEventListener('click', async () => {
         clearAnalysis();
         resetCountdown();
 
+        // 隱藏分析結果框（練習開始時）
+        const analysisDisplay = document.getElementById('analysisDisplay');
+        if (analysisDisplay) {
+            analysisDisplay.style.display = 'none';
+        }
+
         // 顯示 record-controls panel（新練習開始時）
         const recordControlsPanel = document.querySelector('.record-controls.panel');
         if (recordControlsPanel) {
@@ -1667,7 +1663,7 @@ function updateDialogueDisplay(speaker, message, audioFilePath = null) {
     
     dialogueDisplay.appendChild(messageDiv);
     dialogueCount++;
-    messageDiv.scrollIntoView({ behavior: 'smooth' });
+    // messageDiv.scrollIntoView({ behavior: 'smooth' }); // 已停用自動滾動
 }
 
 function playAudio(audioFilePath) {
@@ -1825,7 +1821,7 @@ function updateTranscriptionPreview(text) {
     if (previousPreview) previousPreview.remove();
     
     dialogueDisplay.appendChild(messageDiv);
-    messageDiv.scrollIntoView({ behavior: 'smooth' });
+    // messageDiv.scrollIntoView({ behavior: 'smooth' }); // 已停用自動滾動
 }
 
 function clearTranscriptionPreview() {
