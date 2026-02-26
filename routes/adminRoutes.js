@@ -9,6 +9,21 @@ const adminAuth = require('../middleware/adminAuth');
 console.log('✅ adminRoutes.js 已載入');
 
 /**
+ * 檢查非語言數據是否有效（有實際測量值，不全為0或undefined）
+ */
+function hasValidNonverbalData(nonverbalData) {
+    if (!nonverbalData) return false;
+    
+    // 檢查是否有任何一個關鍵指標有有效的非零值
+    const hasEyeContact = nonverbalData.eyeContactRate !== undefined && nonverbalData.eyeContactRate > 0;
+    const hasSmile = nonverbalData.smileRate !== undefined && nonverbalData.smileRate > 0;
+    const hasPosture = nonverbalData.openPostureRate !== undefined && nonverbalData.openPostureRate > 0;
+    const hasGestures = nonverbalData.gesturesUsed !== undefined && nonverbalData.gesturesUsed > 0;
+    
+    return hasEyeContact || hasSmile || hasPosture || hasGestures;
+}
+
+/**
  * POST /api/admin/login
  * Admin 登入
  */
@@ -128,10 +143,12 @@ router.get('/users', adminAuth, async (req, res) => {
             return {
                 ...userObj,
                 stats: {
-                    totalPractices: practices.length,
-                    completedPractices: practices.filter(p => p.completed).length,
+                    totalPractices: practices.filter(p => p.analysis && p.analysis.trim() !== '').length,
+                    completedPractices: practices.filter(p => p.analysis && p.analysis.trim() !== '').length,
                     totalRecordings: practices.reduce((sum, p) => sum + (p.recordings?.length || 0), 0),
-                    practicesWithNonverbal: practices.filter(p => p.nonverbalSummary).length
+                    practicesWithNonverbal: practices.filter(p => {
+                        return p.history?.some(h => h.role === '導師' && h.nonverbalData && hasValidNonverbalData(h.nonverbalData));
+                    }).length
                 }
             };
         });
@@ -177,10 +194,12 @@ router.get('/users/:userId', adminAuth, async (req, res) => {
         // 計算練習統計
         const practices = user.practices || [];
         const stats = {
-            totalPractices: practices.length,
-            completedPractices: practices.filter(p => p.completed).length,
+            totalPractices: practices.filter(p => p.analysis && p.analysis.trim() !== '').length,
+            completedPractices: practices.filter(p => p.analysis && p.analysis.trim() !== '').length,
             totalRecordings: practices.reduce((sum, p) => sum + (p.recordings?.length || 0), 0),
-            practicesWithNonverbal: practices.filter(p => p.nonverbalSummary).length,
+            practicesWithNonverbal: practices.filter(p => {
+                return p.history?.some(h => h.role === '導師' && h.nonverbalData && hasValidNonverbalData(h.nonverbalData));
+            }).length,
             techniqueBreakdown: {}
         };
 
@@ -280,10 +299,16 @@ router.get('/stats', adminAuth, async (req, res) => {
 
         users.forEach(user => {
             const practices = user.practices || [];
-            totalPractices += practices.length;
-            completedPractices += practices.filter(p => p.completed).length;
+            // 只統計已完成的練習（有 analysis 的）
+            const completed = practices.filter(p => p.analysis && p.analysis.trim() !== '').length;
+            totalPractices += completed;
+            completedPractices += completed;
             totalRecordings += practices.reduce((sum, p) => sum + (p.recordings?.length || 0), 0);
-            practicesWithNonverbal += practices.filter(p => p.nonverbalSummary).length;
+            
+            // 只統計真正有有效非語言數據的練習
+            practicesWithNonverbal += practices.filter(p => {
+                return p.history?.some(h => h.role === '導師' && h.nonverbalData && hasValidNonverbalData(h.nonverbalData));
+            }).length;
 
             practices.forEach(p => {
                 if (p.technique) {
@@ -369,6 +394,180 @@ router.delete('/users/:userId', adminAuth, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '刪除使用者失敗',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/users/:userId/practices/:practiceId/nonverbal
+ * 獲取特定練習的詳細非語言分析數據
+ */
+router.get('/users/:userId/practices/:practiceId/nonverbal', adminAuth, async (req, res) => {
+    try {
+        const { userId, practiceId } = req.params;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: '使用者不存在'
+            });
+        }
+
+        const practice = user.practices.id(practiceId);
+
+        if (!practice) {
+            return res.status(404).json({
+                success: false,
+                message: '練習不存在'
+            });
+        }
+
+        // 提取所有包含有效非語言數據的對話輪次
+        const nonverbalDetails = practice.history
+            .filter(entry => entry.role === '導師' && entry.nonverbalData && hasValidNonverbalData(entry.nonverbalData))
+            .map((entry, index) => ({
+                turnNumber: index + 1,
+                content: entry.content,
+                timestamp: entry.timestamp,
+                nonverbalData: {
+                    eyeContactRate: entry.nonverbalData.eyeContactRate,
+                    smileRate: entry.nonverbalData.smileRate,
+                    openPostureRate: entry.nonverbalData.openPostureRate,
+                    gesturesUsed: entry.nonverbalData.gesturesUsed,
+                    gesturesList: entry.nonverbalData.gesturesList || [],
+                    rawData: entry.nonverbalData.rawData || {},
+                    dataQuality: entry.nonverbalData.dataQuality || {}
+                }
+            }));
+
+        // 計算平均值
+        let avgEyeContact = 0;
+        let avgSmile = 0;
+        let avgOpenPosture = 0;
+        let totalGestures = 0;
+
+        if (nonverbalDetails.length > 0) {
+            nonverbalDetails.forEach(detail => {
+                avgEyeContact += detail.nonverbalData.eyeContactRate || 0;
+                avgSmile += detail.nonverbalData.smileRate || 0;
+                avgOpenPosture += detail.nonverbalData.openPostureRate || 0;
+                totalGestures += detail.nonverbalData.gesturesUsed || 0;
+            });
+
+            avgEyeContact /= nonverbalDetails.length;
+            avgSmile /= nonverbalDetails.length;
+            avgOpenPosture /= nonverbalDetails.length;
+        }
+
+        res.json({
+            success: true,
+            practiceId: practice._id,
+            technique: practice.technique,
+            scenario: practice.scenario,
+            createdAt: practice.createdAt,
+            summary: {
+                averageEyeContactRate: avgEyeContact,
+                averageSmileRate: avgSmile,
+                averageOpenPostureRate: avgOpenPosture,
+                totalGestures: totalGestures,
+                dataPointsCount: nonverbalDetails.length
+            },
+            nonverbalSummary: practice.nonverbalSummary || null,
+            details: nonverbalDetails,
+            hasNonverbalData: nonverbalDetails.length > 0
+        });
+
+    } catch (error) {
+        console.error('❌ 獲取非語言分析數據失敗:', error);
+        res.status(500).json({
+            success: false,
+            message: '獲取非語言分析數據失敗',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/nonverbal/overview
+ * 獲取所有使用者的非語言數據概覽
+ */
+router.get('/nonverbal/overview', adminAuth, async (req, res) => {
+    try {
+        const { technique = '', limit = 50 } = req.query;
+
+        const users = await User.find().select('username email practices');
+
+        const nonverbalData = [];
+
+        users.forEach(user => {
+            let practices = user.practices || [];
+
+            // 過濾有有效非語言數據的練習
+            practices = practices.filter(p => {
+                const hasValidNonverbal = p.history?.some(h => h.role === '導師' && h.nonverbalData && hasValidNonverbalData(h.nonverbalData));
+                const matchesTechnique = technique ? p.technique === technique : true;
+                return hasValidNonverbal && matchesTechnique;
+            });
+
+            practices.forEach(practice => {
+                const nonverbalEntries = practice.history
+                    .filter(h => h.role === '導師' && h.nonverbalData && hasValidNonverbalData(h.nonverbalData));
+
+                if (nonverbalEntries.length > 0) {
+                    // 計算這次練習的平均值
+                    let avgEyeContact = 0;
+                    let avgSmile = 0;
+                    let avgOpenPosture = 0;
+                    let totalGestures = 0;
+
+                    nonverbalEntries.forEach(entry => {
+                        avgEyeContact += entry.nonverbalData.eyeContactRate || 0;
+                        avgSmile += entry.nonverbalData.smileRate || 0;
+                        avgOpenPosture += entry.nonverbalData.openPostureRate || 0;
+                        totalGestures += entry.nonverbalData.gesturesUsed || 0;
+                    });
+
+                    avgEyeContact /= nonverbalEntries.length;
+                    avgSmile /= nonverbalEntries.length;
+                    avgOpenPosture /= nonverbalEntries.length;
+
+                    nonverbalData.push({
+                        userId: user._id,
+                        username: user.username,
+                        email: user.email,
+                        practiceId: practice._id,
+                        technique: practice.technique,
+                        createdAt: practice.createdAt,
+                        averageEyeContactRate: avgEyeContact,
+                        averageSmileRate: avgSmile,
+                        averageOpenPostureRate: avgOpenPosture,
+                        totalGestures: totalGestures,
+                        dataPointsCount: nonverbalEntries.length
+                    });
+                }
+            });
+        });
+
+        // 按時間排序（最新的在前）
+        nonverbalData.sort((a, b) => b.createdAt - a.createdAt);
+
+        // 限制返回數量
+        const limitedData = nonverbalData.slice(0, parseInt(limit));
+
+        res.json({
+            success: true,
+            total: nonverbalData.length,
+            data: limitedData
+        });
+
+    } catch (error) {
+        console.error('❌ 獲取非語言數據概覽失敗:', error);
+        res.status(500).json({
+            success: false,
+            message: '獲取非語言數據概覽失敗',
             error: error.message
         });
     }

@@ -507,7 +507,7 @@ async function loadPractices() {
             return;
         }
         
-        // 過濾已有分析結果的練習
+        // 過濾已完成的練習（只檢查 analysis 是否存在）
         let analyzedPractices = practices.filter(practice => {
             return practice.analysis !== undefined && practice.analysis !== null && practice.analysis !== '';
         });
@@ -613,6 +613,7 @@ function displayFilteredPractices(practices) {
             const deleteButton = document.createElement('button');
             deleteButton.textContent = '刪除';
             deleteButton.classList.add('small-btn');
+            
             deleteButton.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (confirm('確認刪除此練習紀錄？')) {
@@ -1325,7 +1326,7 @@ async function handleSubmission(text) {
                 await handleDialogueEnd(currentPracticeId, data.analysis);
             } else if (data.response) {
                 updateDialogueDisplay("家長", data.response, data.audioFilePath);
-                if (dialogueCount >= 7) {
+                if (dialogueCount >= 12) {
                     disableUserInput();
                     showEndDialogueMessage();
                 } else {

@@ -32,10 +32,12 @@ async function handleDialogueSubmission(transcription, practiceId) {
     // 如果對話達到結束條件，執行分析
     if (dialogueState.count >= 12) {
       console.log('Dialogue complete, performing analysis'); // 調試用
-      const analysis = await analyzeDialogue();
+      const analysis = await analyzeDialogue(practiceId);
 
-      // 保存歷史與分析結果到練習紀錄
-      await updatePractice(practiceId, { history: dialogueState.history, analysis });
+      // 保存歷史到練習紀錄（analysis 和 status 由 analyzeDialogue 內部處理）
+      await updatePractice(practiceId, { 
+        history: dialogueState.history
+      });
 
       return {
         completed: true,
