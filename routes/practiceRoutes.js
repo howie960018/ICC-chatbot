@@ -31,7 +31,7 @@ router.get('/practices', async (req, res) => {
       return res.status(401).json({ success: false, message: "未授權訪問" });
     }
 
-    const { technique, difficulty, dateRange, searchQuery, completed } = req.query;
+    const { technique, difficulty, dateRange, searchQuery, completed, page = 1, limit = 10 } = req.query;
 
     let practices = await getPractices(userId) || [];
     let filteredPractices = [...practices]; // 創建副本以便篩選
@@ -91,11 +91,27 @@ router.get('/practices', async (req, res) => {
       }
     }
 
+    // 計算分頁
+    const totalPractices = filteredPractices.length;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const totalPages = Math.ceil(totalPractices / limitNum);
+
+    // 應用分頁切片
+    const paginatedPractices = filteredPractices.slice(skip, skip + limitNum);
+
     // 使用與原始代碼一致的格式返回結果
     return res.json({ 
       success: true, 
-      practices: filteredPractices,
-      total: filteredPractices.length
+      practices: paginatedPractices,
+      total: totalPractices,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalPages: totalPages,
+        hasMore: pageNum < totalPages
+      }
     });
     
   } catch (error) {

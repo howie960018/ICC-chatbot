@@ -931,10 +931,19 @@
         }
 
         // 查看使用者的所有練習紀錄
-        async function viewUserPractices(userId, username) {
+        let currentPracticesPage = 1;
+        let currentPracticesUserId = null;
+        let currentPracticesUsername = null;
+        const practicesPerPage = 10;
+
+        async function viewUserPractices(userId, username, page = 1) {
             try {
+                currentPracticesUserId = userId;
+                currentPracticesUsername = username;
+                currentPracticesPage = page;
+
                 const token = checkAuth();
-                const response = await fetch(`/api/admin/users/${userId}/practices`, {
+                const response = await fetch(`/api/admin/users/${userId}/practices?page=${page}&limit=${practicesPerPage}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -943,7 +952,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    displayPractices(data.practices, username);
+                    displayPractices(data.practices, username, data.pagination);
                     // 關閉使用者詳情modal,開啟練習modal
                     closeModal();
                 } else {
@@ -955,8 +964,16 @@
             }
         }
 
+        // 練習分頁控制
+        function changePracticesPage(direction) {
+            const newPage = currentPracticesPage + direction;
+            if (newPage >= 1) {
+                viewUserPractices(currentPracticesUserId, currentPracticesUsername, newPage);
+            }
+        }
+
         // 顯示練習詳情
-        function displayPractices(practices, username) {
+        function displayPractices(practices, username, pagination) {
             const modal = document.getElementById('practicesModal');
             const title = document.getElementById('practicesModalTitle');
             const container = document.getElementById('practicesDetails');
@@ -964,7 +981,9 @@
             // 只顯示有 AI 回饋分析的練習（資料模型中無 `completed` 欄位）
             const filteredPractices = practices.filter(p => p && p.analysis && p.analysis.toString().trim().length > 0);
 
-            title.textContent = `${username} 的練習紀錄 (共 ${filteredPractices.length} 筆)`;
+            // 使用分頁資訊中的總數
+            const totalCount = pagination ? pagination.total : filteredPractices.length;
+            title.textContent = `${username} 的練習紀錄 (共 ${totalCount} 筆)`;
 
             if (filteredPractices.length === 0) {
                 container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">該使用者尚無已完成且含 AI 回饋的練習紀錄</p>';
@@ -1148,6 +1167,27 @@
                     </div>
                 `;
             });
+
+            // 添加分頁控件
+            if (pagination && pagination.pages > 1) {
+                html += `
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 10px; padding: 20px; border-top: 1px solid #ddd; margin-top: 20px;">
+                        <button 
+                            onclick="changePracticesPage(-1)" 
+                            ${pagination.page === 1 ? 'disabled' : ''}
+                            style="padding: 8px 16px; background: ${pagination.page === 1 ? '#ccc' : '#3498db'}; color: white; border: none; border-radius: 5px; cursor: ${pagination.page === 1 ? 'not-allowed' : 'pointer'};">
+                            上一頁
+                        </button>
+                        <span style="color: #666;">第 ${pagination.page} / ${pagination.pages} 頁</span>
+                        <button 
+                            onclick="changePracticesPage(1)" 
+                            ${pagination.page >= pagination.pages ? 'disabled' : ''}
+                            style="padding: 8px 16px; background: ${pagination.page >= pagination.pages ? '#ccc' : '#3498db'}; color: white; border: none; border-radius: 5px; cursor: ${pagination.page >= pagination.pages ? 'not-allowed' : 'pointer'};">
+                            下一頁
+                        </button>
+                    </div>
+                `;
+            }
 
             container.innerHTML = html;
             modal.style.display = 'flex';

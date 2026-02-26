@@ -9,6 +9,12 @@ const MAX_RECORDING_TIME = 120;  // 最大錄音時間（秒）
 let recordingProgress = 0; // 錄音進度（0-100）
 let isRecordingTimeDisplay = false; // 是否顯示倒計時
 
+// 分頁相關變數
+let currentPracticePage = 1;
+const practicesPerPage = 10;
+let totalPracticePages = 1;
+let currentFilters = {};
+
 let countdownTimer = null; 
 let challengeTimer = null; // 挑戰倒計時計時器
 let countdownRemaining = 300; // 倒計時剩餘時間（以秒為單位）
@@ -399,12 +405,21 @@ function filterPractices() {
     displayFilteredPractices(filteredPractices);
 }
 
-// 載入所有練習
-async function loadPractices() {
+// 載入所有練習（支持分頁）
+async function loadPractices(page = 1) {
     const token = localStorage.getItem('token');
+    currentPracticePage = page;
 
     try {
-        const response = await fetch('/api/practice/practices', {
+        // 構建查詢參數
+        const params = new URLSearchParams({
+            page: page,
+            limit: practicesPerPage,
+            completed: 'true',
+            ...currentFilters
+        });
+
+        const response = await fetch(`/api/practice/practices?${params.toString()}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         
@@ -415,6 +430,7 @@ async function loadPractices() {
         const data = await response.json();
         const practiceList = document.getElementById('practiceList');
         const practiceSearchContainer = document.getElementById('practiceSearchContainer');
+        const paginationContainer = document.getElementById('practicesPagination');
         
         // 建立篩選 UI
         if (!practiceSearchContainer) {
@@ -479,11 +495,23 @@ async function loadPractices() {
                 difficultyFilter.appendChild(el);
             });
             
-            // 事件監聽
-            searchInput.addEventListener('input', filterPractices);
-            dateFilter.addEventListener('change', filterPractices);
-            techniqueFilter.addEventListener('change', filterPractices);
-            difficultyFilter.addEventListener('change', filterPractices);
+            // 事件監聽 - 更新為使用分頁加載
+            searchInput.addEventListener('input', () => {
+                currentFilters.searchQuery = searchInput.value;
+                loadPractices(1); // 搜索時返回第一頁
+            });
+            dateFilter.addEventListener('change', () => {
+                currentFilters.dateRange = dateFilter.value;
+                loadPractices(1);
+            });
+            techniqueFilter.addEventListener('change', () => {
+                currentFilters.technique = techniqueFilter.value;
+                loadPractices(1);
+            });
+            difficultyFilter.addEventListener('change', () => {
+                currentFilters.difficulty = difficultyFilter.value;
+                loadPractices(1);
+            });
             
             searchContainer.appendChild(searchInput);
             searchContainer.appendChild(dateFilter);
@@ -496,29 +524,30 @@ async function loadPractices() {
         practiceList.innerHTML = '';
 
         let practices = [];
-        if (Array.isArray(data)) {
+        let totalCount = 0;
+        let pagination = null;
+
+        if (data.success && Array.isArray(data.practices)) {
+            practices = data.practices;
+            totalCount = data.total || practices.length;
+            pagination = data.pagination;
+        } else if (Array.isArray(data)) {
             practices = data;
-        } else if (data.success && Array.isArray(data.practices)) {
-            practices = data.practices;
-        } else if (data.total !== undefined && Array.isArray(data.practices)) {
-            practices = data.practices;
+            totalCount = practices.length;
         } else {
             practiceList.innerHTML = '<li class="error-message">API回應格式異常</li>';
+            if (paginationContainer) paginationContainer.style.display = 'none';
             return;
         }
         
-        // 過濾已完成的練習（只檢查 analysis 是否存在）
-        let analyzedPractices = practices.filter(practice => {
-            return practice.analysis !== undefined && practice.analysis !== null && practice.analysis !== '';
-        });
-        
-        if (analyzedPractices.length === 0) {
+        if (totalCount === 0) {
             practiceList.innerHTML = '<li class="no-practice">尚無完成的練習記錄</li>';
             const emptyPracticesGuide = document.getElementById('emptyPracticesGuide');
             if (emptyPracticesGuide) {
                 emptyPracticesGuide.style.display = 'block';
                 practiceList.style.display = 'none';
             }
+            if (paginationContainer) paginationContainer.style.display = 'none';
             return;
         } else {
             const emptyPracticesGuide = document.getElementById('emptyPracticesGuide');
@@ -528,20 +557,63 @@ async function loadPractices() {
             }
         }
         
-        window.practicesData = analyzedPractices;
-        
         const practicesCount = document.getElementById('practicesCount');
         if (practicesCount) {
-            practicesCount.textContent = `(${analyzedPractices.length})`;
+            practicesCount.textContent = `(${totalCount})`;
         }
         
-        displayFilteredPractices(analyzedPractices);
+        // 更新分頁資訊
+        if (pagination) {
+            totalPracticePages = pagination.totalPages;
+            updatePracticePagination(pagination);
+        }
+        
+        displayFilteredPractices(practices);
         
     } catch (error) {
         console.error('載入練習失敗:', error);
         const practiceList = document.getElementById('practiceList');
         if(practiceList) practiceList.innerHTML = '<li class="error-message">載入練習時發生錯誤: ' + error.message + '</li>';
+        const paginationContainer = document.getElementById('practicesPagination');
+        if (paginationContainer) paginationContainer.style.display = 'none';
     }
+}
+
+// 更新分頁控件
+function updatePracticePagination(pagination) {
+    const paginationContainer = document.getElementById('practicesPagination');
+    const paginationInfo = document.getElementById('practicesPaginationInfo');
+    const prevBtn = document.getElementById('practicesPrevBtn');
+    const nextBtn = document.getElementById('practicesNextBtn');
+
+    if (!paginationContainer) return;
+
+    // 如果只有一頁，隱藏分頁控件
+    if (pagination.totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    paginationInfo.textContent = `第 ${pagination.page} / ${pagination.totalPages} 頁`;
+    
+    prevBtn.disabled = pagination.page === 1;
+    nextBtn.disabled = pagination.page >= pagination.totalPages;
+}
+
+// 切換練習頁面
+function changePracticePage(direction) {
+    const newPage = currentPracticePage + direction;
+    
+    if (newPage >= 1 && newPage <= totalPracticePages) {
+        loadPractices(newPage);
+    }
+}
+
+// 修正後的篩選函數（已整合到 loadPractices 中）
+function filterPractices() {
+    // 現在由 loadPractices 處理篩選和分頁
+    loadPractices(1);
 }
 
 // 顯示篩選後的練習列表
