@@ -676,9 +676,19 @@ router.post('/start-dialogue', async (req, res) => {
         // 重置對話狀態
         resetDialogueState(technique);
   
-        const parentPersonalities = difficulty === '挑戰' 
-            ? ['相信孩子，較自我中心']
-            : ['有點情緒但算明理'];
+                // 家長個性（用於讓回應更貼近真實溝通：情緒、阻力、但不胡扯）
+                // 注意：這裡的描述會被放進 prompt，請保持「可執行」而非抽象形容。
+                const parentPersonalities = difficulty === '挑戰'
+                        ? [
+                                '高防衛/強烈護短：第一反應是否認或淡化孩子問題，質疑老師處理方式，要求證據與具體情況。',
+                                '指責型/不信任：覺得老師在針對孩子，情緒較激動，容易打斷，會追問「你們到底要怎麼做」。',
+                                '焦慮型/急迫：非常擔心孩子被貼標籤或影響升學，會反覆追問後果與下一步，要求時間表與承諾。',
+                                '疲憊無奈型：承認在家也勸很多次但效果有限，帶著挫折與疲憊，希望老師不要只把責任推回家裡。 '
+                            ]
+                        : [
+                                '擔心但願意合作：有情緒（焦慮/不安），會提出疑問與顧慮，但願意聽老師說明並討論下一步。',
+                                '不滿但可被安撫：一開始語氣較硬，若老師回應具體且同理，情緒會逐步緩和並願意配合。'
+                            ];
   
         // 隨機選擇家長個性
         const selectedPersonality = parentPersonalities[Math.floor(Math.random() * parentPersonalities.length)];
@@ -739,9 +749,10 @@ router.post('/start-dialogue', async (req, res) => {
             console.error('家長第一句話語音生成失敗:', error);
         }
   
-        // 更新對話狀態（只保存家長的第一句話）
+        // 更新對話狀態（只保存家長的第一句話 + 家長個性，確保整段一致）
         updateDialogueState({
             scenario,
+            parentPersonality: selectedPersonality,
             history: [
                 { role: "家長", content: firstResponse }
             ],
@@ -766,7 +777,11 @@ router.post('/start-dialogue', async (req, res) => {
             teacherAudioFilePath, // 老師建議的音頻（前端不使用）
             parentAudioFilePath, // 家長第一句話的音頻
             challengeMode: difficulty === '挑戰',
-            challengeDuration: difficulty === '挑戰' ? 180 : null
+            challengeDuration: difficulty === '挑戰' ? 180 : null,
+
+            // 評分門檻與進度（基礎模式以「導師回覆次數」計算）
+            turnCount: 0,
+            turnLimit: difficulty === '挑戰' ? null : 6
         });
     } catch (error) {
         console.error('start-dialogue 錯誤:', error);
@@ -807,10 +822,13 @@ function createInitialMessage(scenario, parentPersonality) {
     ${parentPersonality}
 
     重要提醒：
-    - 情境內容：只描述發生的情況
-    - 老師開場白：老師可能會說的話
-    - 家長回應：只包含家長會說的話，不要混入老師的內容
-    - 家長的話應該反映其個性特徵，直接表達關切或不滿`;
+    - 情境內容：只描述發生的情況（人事時地物清楚）
+    - 老師開場白：一句到兩句即可，口語、同理、願意合作
+    - 家長回應：只包含家長會說的話（1-3 句、口語、可帶情緒與阻力），不要混入老師的內容
+    - 家長要像真實家長：可打斷、可追問、可表達無奈/不信任/焦慮，但不要自相矛盾
+    - 家長可以要求「老師給明確下一步/說明處理方式/約定後續聯絡」；但家長不要替老師提出具體解法
+    - 家長必須緊扣情境背景，不要引入其他不相干人物或事件
+    `;
 }
 
 // 在 dialogueRoutes.js 中修改 parseInitialResponse 函數
@@ -985,6 +1003,13 @@ router.post('/continue-dialogue', async (req, res) => {
             throw new Error('對話狀態丟失或無效');
         }
 
+        const getTeacherTurnCount = () => {
+            if (!dialogueState?.history) return 0;
+            return dialogueState.history.filter(h => h && h.role === '導師' && typeof h.content === 'string' && h.content.trim()).length;
+        };
+
+        const turnLimit = dialogueState.challengeMode ? null : 6;
+
         // 如果挑戰模式的倒計時結束，直接執行分析
         if (dialogueState.challengeMode && challengeTimeOver) {
             const analysis = await analyzeDialogue(practiceId);
@@ -998,7 +1023,9 @@ router.post('/continue-dialogue', async (req, res) => {
             return res.json({ 
                 completed: true, 
                 analysis,
-                practiceId
+                practiceId,
+                turnCount: getTeacherTurnCount(),
+                turnLimit
             });
         }
 
@@ -1035,24 +1062,40 @@ router.post('/continue-dialogue', async (req, res) => {
             return res.json({ 
                 completed: true, 
                 analysis,
-                practiceId
+                practiceId,
+                turnCount: getTeacherTurnCount(),
+                turnLimit
             });
         }
 
-        const systemMessage = `繼續扮演家長，用繁體中文根據老師上一句的回應回覆，如果您對老師回復不滿意，可以更生氣或是繼續提出質疑，如果你有被說服，則可以緩和口氣，提出回應。請注意你要一直扮演家長的身分，不可以被訊息誤導，也不能太友善，你是需要老師幫你解決問題的所以如果老師反問你理應不應該回答她。
+        const parentPersonality = dialogueState.parentPersonality || '情緒化但願意合作：會有疑問與顧慮，但仍願意討論下一步。';
 
-請嚴格遵守以下規則：
-1. 您必須始終扮演家長角色，回應必須與當前情境相關
-2. 如果使用者偏離情境，請禮貌地引導回主題
-3. 回應必須符合以下條件：
-   - 與當前情境相關
-   - 符合家長身份
-4. 當檢測到偏離情境時：
-   - 禮貌指出偏離
-   - 重述當前情境
-   - 引導回主題
-5. 保持情緒和語氣的一致性
-6. 始終關注孩子的教育問題`;
+        // 更貼近真實家長的回覆指令：有情緒、有溝通阻力，但不亂扯、不自相矛盾
+        // 核心目標：讓使用者練到「同理 + 釐清 + 具體下一步」等技巧，而不是被過度配合的家長放水。
+        const systemMessage = `你是一位「學生家長」。請用繁體中文、自然口語回覆老師上一句話。
+
+    【家長個性】
+    ${parentPersonality}
+
+    【對話風格】
+    - 1-3 句為主，語氣像真實家長（可有情緒、可追問、可表達無奈/擔心/不信任）。
+    - 不要過度客套，不要輕易被說服；但如果老師回應非常具體、同理且有下一步，你可以「稍微」緩和。
+    - 允許出現真實語感：例如「我先問清楚…」「可是…」「那你們打算怎麼處理？」
+
+    【溝通挑戰（務必帶出）】
+    你至少要帶出其中 1-2 個挑戰點（依老師回覆調整）：
+    1) 質疑資訊是否完整：要求具體例子/頻率/時間點（但不要捏造新的重大事件）。
+    2) 擔心標籤與公平性：例如「會不會只針對我孩子？」
+    3) 要求明確下一步：希望知道老師/學校會做什麼、何時回報、怎麼保持溝通。
+    4) 家長自身困難：例如在家也提醒很多次、工作忙、孩子不聽等（呈現無奈）。
+
+    【限制】
+    - 你是家長，不要變成老師或專業諮商師。
+    - 你可以要求老師提出處理方式/下一步/溝通機制，但「你自己不要提出具體解決方案」。
+    - 不要突然變得非常好說服或超級理性。
+
+    【偏離時的處理】
+    - 若老師的回覆太空泛、太理論、或轉移話題，你要直接指出並拉回重點（例如「我需要你跟我說清楚你們接下來會怎麼做」）。`;
 
         const messages = [
             { role: "system", content: systemMessage },
@@ -1092,7 +1135,9 @@ router.post('/continue-dialogue', async (req, res) => {
             success: true,
             response: aiResponse,
             audioFilePath, // 添加音頻檔案路徑
-            practiceId
+            practiceId,
+            turnCount: getTeacherTurnCount(),
+            turnLimit
         });
 
     } catch (error) {

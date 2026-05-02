@@ -21,6 +21,20 @@ let countdownRemaining = 300; // 倒計時剩餘時間（以秒為單位）
 let mediaRecorder = null;
 let audioChunks = [];
 let dialogueCount = 0;
+
+// 基礎模式評分門檻：導師回覆 6 次後產生分析（後端 count>=12 因為家長/導師都算）
+const BASIC_TURN_LIMIT = 6;
+let turnProgress = { count: 0, limit: null };
+
+function setTurnProgress(count, limit) {
+    if (typeof count === 'number') turnProgress.count = count;
+    turnProgress.limit = (limit === null || typeof limit === 'number') ? limit : turnProgress.limit;
+}
+
+function getTurnProgressText() {
+    if (turnProgress.limit === null || typeof turnProgress.limit !== 'number') return '';
+    return `（進度 ${turnProgress.count}/${turnProgress.limit}）`;
+}
 let isWaitingForSubmission = false;
 let submissionTimer = null;
 let currentDialogueRecordings = [];
@@ -812,7 +826,7 @@ function displayPracticeDetails(practice, nonverbalData) {
                 paragraphElement.style.lineHeight = '1.6';
 
                 // (A) 處理標題 (對話分析、統計數據等)
-                if (text.match(/^(對話分析|具體修正建議|整體回饋|統計數據)[：:]?/)) {
+                if (text.match(/^(對話分析|具體修正建議|整體回饋|統計數據|逐句教練|逐句修正|示範改寫)[：:]?/)) {
                     // 加上左邊框裝飾，讓標題更明顯
                     paragraphElement.innerHTML = `<h4 style="margin: 15px 0 8px 0; color: #333; border-left: 4px solid #e93ae1; padding-left: 10px;">${text}</h4>`;
                 }
@@ -1287,6 +1301,18 @@ async function startDialogue(practiceId, specifiedScenario = null) {
         if (!data.success) {
             throw new Error(data.message || 'API 回應失敗');
         }
+
+        // 先更新門檻/進度（若後端有回傳，優先使用；否則用前端預設）
+        const difficultyForHint = difficulty;
+        const initialLimit = (typeof data.turnLimit !== 'undefined') ? data.turnLimit : (difficultyForHint === '簡單' ? BASIC_TURN_LIMIT : null);
+        const initialCount = (typeof data.turnCount === 'number') ? data.turnCount : 0;
+        setTurnProgress(initialCount, initialLimit);
+
+        if (difficultyForHint === '簡單') {
+            recordStatus.textContent = `提示：本模式需完成 ${BASIC_TURN_LIMIT} 輪老師回覆後才會評分。${getTurnProgressText()}`;
+        } else if (difficultyForHint === '挑戰') {
+            recordStatus.textContent = '提示：挑戰模式以倒數結束後自動評分。';
+        }
         
         scenarioDisplay.innerHTML = `
             <div class="message-header">📝 情境</div>
@@ -1391,6 +1417,14 @@ async function handleSubmission(text) {
         const data = await response.json();
         if (!data) throw new Error('無效的回應數據');
 
+        // 更新進度（後端回傳 turnCount/turnLimit）
+        if (typeof data.turnCount === 'number' || typeof data.turnLimit !== 'undefined') {
+            setTurnProgress(
+                typeof data.turnCount === 'number' ? data.turnCount : turnProgress.count,
+                typeof data.turnLimit !== 'undefined' ? data.turnLimit : turnProgress.limit
+            );
+        }
+
         if (difficulty === '簡單') {
             if (data.completed && data.analysis) {
                 analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
@@ -1402,7 +1436,7 @@ async function handleSubmission(text) {
                     disableUserInput();
                     showEndDialogueMessage();
                 } else {
-                    recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+                    recordStatus.textContent = `請點擊 "開始錄音" 回應下一句內容。${getTurnProgressText()}`;
                     enableUserInput();
                 }
             }
@@ -1413,7 +1447,7 @@ async function handleSubmission(text) {
                 await handleDialogueEnd(currentPracticeId, data.analysis);
             } else if (data.response) {
                 updateDialogueDisplay("家長", data.response, data.audioFilePath);
-                recordStatus.textContent = '請點擊 "開始錄音" 回應下一句內容。';
+                recordStatus.textContent = `請點擊 "開始錄音" 回應下一句內容。${getTurnProgressText()}`;
                 enableUserInput();
             }
         }

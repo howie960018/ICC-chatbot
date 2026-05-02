@@ -95,6 +95,26 @@ function generatePrompt(technique, conversationHistory, nonverbalData = null) {
   }
 }
 
+// 讓回饋「具體可操作」：避免抽象評語，並提供逐句教練（引用原句 + 示範改寫）
+function getConcreteCoachingRules() {
+  return `
+
+【輸出規則（務必遵守）】
+1) 禁止只有抽象形容詞：例如「更有同理心」「更深層的自我情感表達」「更具體」等。
+   - 若你使用任何抽象評語，必須立刻補上：
+     (a) 引用 1 句導師原句作為例子（用「原句：...」標示）
+     (b) 給出 1 句更好的替代說法（用「示範：...」標示，且要可直接照念）
+     (c) 用 1 句話說明理由（用「原因：...」標示）
+2) 每一點修正建議都要包含「示範句」。
+3) 新增「逐句教練」區塊：挑選最近 6 句（不足則全部）導師回覆，逐句提供 coaching。
+   - 每句固定三行：
+     原句：...
+     問題點：...（對應技巧要素/溝通目標）
+     示範改寫：...（自然口語、可直接照念、不要太長）
+4) 只評估導師，不要評析家長（但可以引用家長回覆做情境對照）。
+5) 請用繁體中文。`;
+}
+
 /**
  * 我訊息的分析提示模板
  */
@@ -128,7 +148,7 @@ function generateIMessagePrompt(conversationHistory, nonverbalData = null) {
     - 音量控制：清晰、穩定的音量展現自信與專業`;
   }
 
-  return `分析整段對話，針對導師的回應，評估是否正確使用了「我訊息」溝通技巧，並依照A至D的評分標準給予評分與詳細回饋。請不要分析家長的回應，僅針對導師的溝通表現進行評估。${nonverbalSection}
+  return `分析整段對話，針對導師的回應，評估是否正確使用了「我訊息」溝通技巧，並依照A至D的評分標準給予評分與詳細回饋。請不要分析家長的回應，僅針對導師的溝通表現進行評估。${nonverbalSection}${getConcreteCoachingRules()}
 
     評分標準：
     A 等級 (優秀)：
@@ -171,7 +191,10 @@ function generateIMessagePrompt(conversationHistory, nonverbalData = null) {
     4. 提出未來改善作法：[分析導師是否提出具體可行的解決方案或建議]
 
     具體修正建議：
-    [提供3-5點具體改進建議，幫助導師更有效運用「我訊息」技巧]
+    [提供3-5點具體改進建議；每一點都必須包含「原句／示範／原因」]
+
+    逐句教練：
+    [逐句列出最近 6 句導師回覆，每句三行：原句／問題點／示範改寫]
 
     對話歷史：
     ${conversationHistory}`;
@@ -201,7 +224,7 @@ function generateSandwichPrompt(conversationHistory, nonverbalData = null) {
     請額外針對語速、語調、停頓、音量等語音表達技巧給予建議。`;
   }
 
-  return `分析整段對話，針對導師的回應，用繁體中文分析是否正確使用了三明治溝通法技巧(不用對家長給出分析建議)，給導師以下格式的分析，根據評量標準給予導師整段對話的表現等第、整體回饋與修正建議：${nonverbalSection}
+  return `分析整段對話，針對導師的回應，用繁體中文分析是否正確使用了三明治溝通法技巧(不用對家長給出分析建議)，給導師以下格式的分析，根據評量標準給予導師整段對話的表現等第、整體回饋與修正建議：${nonverbalSection}${getConcreteCoachingRules()}
 
     三明治溝通法的參考評分標準:  
     評分等第：
@@ -241,7 +264,10 @@ function generateSandwichPrompt(conversationHistory, nonverbalData = null) {
     [分析導師如何結束對話，給予哪些正面鼓勵或展望]
 
     具體修正建議：
-    [提供3-5點具體改進建議，幫助導師更有效運用三明治溝通法]
+    [提供3-5點具體改進建議；每一點都必須包含「原句／示範／原因」]
+
+    逐句教練：
+    [逐句列出最近 6 句導師回覆，每句三行：原句／問題點／示範改寫]
 
     
     對話歷史：
@@ -273,7 +299,7 @@ function generateComprehensivePrompt(conversationHistory, nonverbalData = null) 
     請額外針對語速、語調、停頓、音量等語音表達技巧給予建議。`;
   }
 
-  return `用繁體中文分析整段對話，針對導師的回應，請根據以下四項指標進行評估，並給出導師以下格式的分析：${nonverbalSection}
+  return `用繁體中文分析整段對話，針對導師的回應，請根據以下四項指標進行評估，並給出導師以下格式的分析：${nonverbalSection}${getConcreteCoachingRules()}
 
     評分標準：
 
@@ -326,7 +352,10 @@ function generateComprehensivePrompt(conversationHistory, nonverbalData = null) 
     [分析導師是否恰當運用溝通技巧，效果如何]
 
     具體修正建議：
-    [提供3-5點具體改進建議，幫助導師提升溝通效果]
+    [提供3-5點具體改進建議；每一點都必須包含「原句／示範／原因」]
+
+    逐句教練：
+    [逐句列出最近 6 句導師回覆，每句三行：原句／問題點／示範改寫]
 
     
     對話歷史：
@@ -352,7 +381,18 @@ function generateDefaultPrompt(conversationHistory, nonverbalData = null) {
     ⚠️請務必在分析中納入非語言行為評估和語音表達建議。`;
   }
 
-  return `分析整段對話，針對導師的回應，指出導師的表現以及如何改進。不用分析家長的，請開始分析：${nonverbalSection}
+  return `分析整段對話，針對導師的回應，指出導師的表現以及如何改進。不用分析家長。${nonverbalSection}${getConcreteCoachingRules()}
+
+    請依照以下格式輸出：
+
+    整體回饋：
+    [用 3-6 句總結導師表現，若有抽象評語必須附原句與示範句]
+
+    具體修正建議：
+    [提供3-5點具體改進建議；每一點都必須包含「原句／示範／原因」]
+
+    逐句教練：
+    [逐句列出最近 6 句導師回覆，每句三行：原句／問題點／示範改寫]
 
     對話歷史：
     ${conversationHistory}`;
