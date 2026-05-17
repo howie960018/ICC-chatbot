@@ -763,11 +763,11 @@
 
                     <div style="margin: 10px 0;">
                         <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #333;">
-                            家長角色：
+                            家長性別：
                         </label>
                         <select id="characterSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; background: white; cursor: pointer;">
-                            <option value="mother">媽媽（溫暖女聲）</option>
-                            <option value="father">爸爸（沉穩男聲）</option>
+                            <option value="mother">女生</option>
+                            <option value="father">男生</option>
                         </select>
                     </div>
                     <div style="margin: 10px 0;">
@@ -783,15 +783,17 @@
                 </div>
 
                 <div id="scenarioDisplay" class="panel"></div>
+                <div id="taskDisplay" class="panel" style="display: none;"></div>
+                <div id="reminderDisplay" class="panel" style="display: none;"></div>
 
                 <!-- 對話與角色垂直排列容器 -->
                 <div class="dialogue-with-avatar" id="dialogueWithAvatar" style="display: none;">
                     <!-- 上方：NPC 角色動畫面板 -->
                     <div id="npcAvatarPanel" class="panel">
-                        <h3 style="margin-bottom: 15px;">👤 家長角色</h3>
+                        <h3 style="margin-bottom: 15px;">👤 家長性別</h3>
                         <div class="npc-avatar-container">
                             <div class="npc-status-indicator" id="npcStatusIndicator"></div>
-                            <img id="npcAvatar" src="" alt="家長角色">
+                            <img id="npcAvatar" src="" alt="家長性別">
                         </div>
                         <audio id="npcAudioPlayer" style="display: none;"></audio>
                     </div>
@@ -822,6 +824,10 @@
                             <div id="textInputControls" style="display: none;">
                                 <textarea id="textInput" placeholder="請在此輸入您的回應..." rows="4" style="width: 100%; margin-bottom: 10px;"></textarea>
                                 <button id="submitTextBtn">提交文字</button>
+                            </div>
+                            <div id="dialogueActionBtns" style="display: none; margin-top: 12px; gap: 10px; flex-wrap: wrap;">
+                                <button id="endDialogueBtn" style="background: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 15px;">結束對話</button>
+                                <button id="extendTimeBtn" style="display: none; background: #ff9800; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 15px;">延長30秒</button>
                             </div>
                         </div>
                     </div>

@@ -143,7 +143,8 @@ async function generateSpeech(text, voice = 'shimmer') {
         model: 'tts-1',
         input: text,
         voice: voice,
-        response_format: 'mp3'
+        response_format: 'mp3',
+        speed: 1.15
       }
     });
 

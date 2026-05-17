@@ -17,7 +17,8 @@ let currentFilters = {};
 
 let countdownTimer = null; 
 let challengeTimer = null; // 挑戰倒計時計時器
-let countdownRemaining = 300; // 倒計時剩餘時間（以秒為單位）
+let countdownRemaining = 300; // 倒計時剩餘時間（以秒為單位）5分鐘
+let totalChallengeExtension = 0; // 累計已延長秒數（最多60秒）
 let mediaRecorder = null;
 let audioChunks = [];
 let dialogueCount = 0;
@@ -34,6 +35,37 @@ function setTurnProgress(count, limit) {
 function getTurnProgressText() {
     if (turnProgress.limit === null || typeof turnProgress.limit !== 'number') return '';
     return `（進度 ${turnProgress.count}/${turnProgress.limit}）`;
+}
+
+function getTaskAndReminder(technique, difficulty) {
+    const isBasic = (difficulty === '簡單');
+    const map = {
+        '我訊息': {
+            task: isBasic
+                ? '請你以導師身分，使用「我訊息」主動聯繫家長。請說明你觀察到的具體情況、表達你的感受或擔心，並邀請家長一起了解原因或討論協助方式。'
+                : '請你以導師身分，使用「我訊息」主動聯繫家長，開啟這次親師溝通。',
+            reminder: isBasic
+                ? '請記得包含以下重點：<br>1. 你觀察到的具體事件。<br>2. 你的感受或擔心。<br>3. 你擔心可能造成的影響。<br>4. 你希望與家長一起合作的方向。<br>5. 語氣要具體、溫和，避免責備學生或家長。'
+                : '請盡量以具體、溫和、合作的方式表達你的觀察、擔心與合作方向。'
+        },
+        '三明治溝通法': {
+            task: isBasic
+                ? '請你以導師身分，使用「三明治溝通法」主動聯繫家長。請先肯定孩子或家長的正向面向，再溫和說明需要討論的問題，最後回到支持、鼓勵與合作的方向。'
+                : '請你以導師身分，使用「三明治溝通法」主動聯繫家長，開啟這次親師溝通。',
+            reminder: isBasic
+                ? '請記得包含以下重點：<br>1. 先指出孩子的優點、努力或家長的用心。<br>2. 再具體說明目前需要關注的問題。<br>3. 說明問題可能造成的影響。<br>4. 最後回到鼓勵、支持與親師合作。<br>5. 語氣要真誠，避免讓肯定聽起來像客套或只是鋪陳責備。'
+                : '請注意正向開場、問題說明與合作收束之間的平衡，語氣要真誠、具體，避免讓家長感覺只是先稱讚再批評。'
+        },
+        '綜合溝通技巧': {
+            task: isBasic
+                ? '請你以導師身分，綜合運用適合的親師溝通技巧，主動聯繫家長。請清楚說明情況，表達關心，回應家長可能的感受與疑問，並邀請家長一起討論協助孩子的方式。'
+                : '請你以導師身分，綜合運用適合的親師溝通技巧，主動聯繫家長，開啟這次親師溝通。',
+            reminder: isBasic
+                ? '請在對話中注意以下重點：<br>1. 情感表現：能展現理解、關心與尊重，避免讓家長感到被責備。<br>2. 內容回應：能回應家長的疑問或擔心，不只重複自己的立場。<br>3. 清晰表達：能把事件、影響與合作方向說清楚，語氣自然且有條理。<br>4. 溝通技巧：能視情況運用我訊息、肯定、澄清、同理、邀請合作等技巧。<br>5. 對話目標是共同理解問題並協助孩子，而不是爭論責任。'
+                : '請維持具體、溫和、合作的語氣，適時回應家長感受與疑問，讓對話朝向理解問題與協助孩子。'
+        }
+    };
+    return map[technique] || { task: '請以導師身分開啟這次親師溝通。', reminder: '' };
 }
 let isWaitingForSubmission = false;
 let submissionTimer = null;
@@ -87,14 +119,8 @@ async function renderNonverbalProgressChart() {
     }
     await waitForChartJs();
 
-    // 取得進步資料
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     try {
-        const res = await fetch('/api/nonverbal/progress', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await fetchWithAuth('/api/nonverbal/progress');
         const data = await res.json();
         
         if (!data.success || !Array.isArray(data.progressData) || data.progressData.length === 0) {
@@ -162,13 +188,17 @@ async function renderNonverbalProgressChart() {
 
 // 頁面載入後自動渲染進步圖表與初始化
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 檢查並修正 API (此函數內容已修正)
-    await fixPracticeRoutes();
-    
-    // 2. 檢查權限
+    // 1. 檢查權限
     if (!checkAuthStatus()) return;
 
-    // 3. 歡迎訊息與 UI 初始化
+    // 2. 驗證 token 是否仍有效（避免 localStorage 殘留過期 token 造成 401）
+    const isTokenValid = await refreshAuthToken();
+    if (!isTokenValid) return;
+
+    // 3. 檢查並修正 API (此函數內容已修正)
+    await fixPracticeRoutes();
+
+    // 4. 歡迎訊息與 UI 初始化
     const welcomeMessage = document.getElementById('welcomeMessage');
     const username = localStorage.getItem('username');
 
@@ -202,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
     }
 
-    // 4. Banner 滾動效果
+    // 5. Banner 滾動效果
     const banner = document.querySelector('.site-banner');
     if(banner) {
         let lastScrollPosition = 0;
@@ -217,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 5. 載入練習列表
+    // 6. 載入練習列表
     await loadPractices();
     currentPracticeId = localStorage.getItem('currentPracticeId');
 
@@ -249,7 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } 
     
-    // 6. 渲染圖表
+    // 7. 渲染圖表
     setTimeout(() => {
         renderNonverbalProgressChart();
     }, 800);
@@ -280,6 +310,41 @@ setInterval(refreshAuthToken, 5 * 60 * 1000); // 每5分鐘檢查一次
 // 認證與登出邏輯
 // ==========================================
 
+function clearAuthStorage() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('currentPracticeId');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userRole');
+}
+
+function forceLogout() {
+    clearAuthStorage();
+    window.location.href = '/login';
+}
+
+async function fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        forceLogout();
+        throw new Error('未登入');
+    }
+
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+    };
+
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+        // Token 無效/過期：自動清除，避免在 /login 因為舊 token 被再次導回 /test 造成死循環
+        forceLogout();
+        throw new Error('認證失敗');
+    }
+
+    return response;
+}
+
 function checkAuthStatus() {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -295,10 +360,13 @@ function checkAuth() {
 
 async function refreshAuthToken() {
     try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            return false;
+        }
+
         const response = await fetch('/api/auth/verify', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (!response.ok) {
@@ -307,16 +375,13 @@ async function refreshAuthToken() {
         return true;
     } catch (error) {
         console.error('Token 驗證失敗:', error);
-        window.location.href = '/login';
+        forceLogout();
         return false;
     }
 }
 
 document.getElementById('logoutButton').addEventListener('click', () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('currentPracticeId');
-    window.location.href = '/login';
+    forceLogout();
 });
 
 // ==========================================
@@ -421,7 +486,6 @@ function filterPractices() {
 
 // 載入所有練習（支持分頁）
 async function loadPractices(page = 1) {
-    const token = localStorage.getItem('token');
     currentPracticePage = page;
 
     try {
@@ -433,9 +497,7 @@ async function loadPractices(page = 1) {
             ...currentFilters
         });
 
-        const response = await fetch(`/api/practice/practices?${params.toString()}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await fetchWithAuth(`/api/practice/practices?${params.toString()}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
@@ -727,20 +789,14 @@ async function selectPractice(practiceId) {
 
 // 載入練習詳細資料
 async function loadPracticeDetails(practiceId) {
-    const token = localStorage.getItem('token');
-
     // 取得語言分析
-    const response = await fetch(`/api/practice/practices/${practiceId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await fetchWithAuth(`/api/practice/practices/${practiceId}`);
     const data = await response.json();
 
     // 取得非語言分析
     let nonverbalData = null;
     try {
-        const nvRes = await fetch(`/api/nonverbal/practice/${practiceId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const nvRes = await fetchWithAuth(`/api/nonverbal/practice/${practiceId}`);
         const nvJson = await nvRes.json();
         if (nvJson.success) {
             nonverbalData = nvJson;
@@ -1152,14 +1208,11 @@ async function createPractice() {
         return null;
     }
 
-    const token = localStorage.getItem('token');
-
     try {
-        const response = await fetch('/api/practice/practices', {
+                const response = await fetchWithAuth('/api/practice/practices', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({ 
                 technique, 
@@ -1186,11 +1239,10 @@ async function createPractice() {
 
 // 刪除練習
 async function deletePractice(practiceId) {
-    const token = localStorage.getItem('token');
     try {
-        const response = await fetch(`/api/practice/practices/${practiceId}`, {
+        const response = await fetchWithAuth(`/api/practice/practices/${practiceId}`, {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` }
+            headers: {}
         });
         const data = await response.json();
 
@@ -1212,12 +1264,10 @@ async function deletePractice(practiceId) {
 // 重新練習
 async function retryPractice(practiceId, scenario) {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/practice/practices/${practiceId}/retry`, {
+            const response = await fetchWithAuth(`/api/practice/practices/${practiceId}/retry`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
         }
       });
       
@@ -1253,9 +1303,15 @@ async function startDialogue(practiceId, specifiedScenario = null) {
 
     const scenarioDisplay = document.getElementById('scenarioDisplay');
     const dialogueDisplay = document.getElementById('dialogueDisplay');
+    const taskDisplayEl = document.getElementById('taskDisplay');
+    const reminderDisplayEl = document.getElementById('reminderDisplay');
+    const actionBtnsEl = document.getElementById('dialogueActionBtns');
 
     scenarioDisplay.innerHTML = '';
     dialogueDisplay.innerHTML = '';
+    if (taskDisplayEl) { taskDisplayEl.innerHTML = ''; taskDisplayEl.style.display = 'none'; }
+    if (reminderDisplayEl) { reminderDisplayEl.innerHTML = ''; reminderDisplayEl.style.display = 'none'; }
+    if (actionBtnsEl) actionBtnsEl.style.display = 'none';
 
     enableUserInput();
 
@@ -1270,11 +1326,10 @@ async function startDialogue(practiceId, specifiedScenario = null) {
         if (!technique) throw new Error('請選擇溝通技巧');
         const characterVoice = getSelectedCharacterVoice();
 
-        const response = await fetch('/api/dialogue/start-dialogue', {
+        const response = await fetchWithAuth('/api/dialogue/start-dialogue', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
                 technique,
@@ -1302,30 +1357,43 @@ async function startDialogue(practiceId, specifiedScenario = null) {
             throw new Error(data.message || 'API 回應失敗');
         }
 
-        // 先更新門檻/進度（若後端有回傳，優先使用；否則用前端預設）
-        const difficultyForHint = difficulty;
-        const initialLimit = (typeof data.turnLimit !== 'undefined') ? data.turnLimit : (difficultyForHint === '簡單' ? BASIC_TURN_LIMIT : null);
+        const initialLimit = difficulty === '簡單' ? 8 : null;
         const initialCount = (typeof data.turnCount === 'number') ? data.turnCount : 0;
         setTurnProgress(initialCount, initialLimit);
 
-        if (difficultyForHint === '簡單') {
-            recordStatus.textContent = `提示：本模式需完成 ${BASIC_TURN_LIMIT} 輪老師回覆後才會評分。${getTurnProgressText()}`;
-        } else if (difficultyForHint === '挑戰') {
-            recordStatus.textContent = '提示：挑戰模式以倒數結束後自動評分。';
-        }
-        
         scenarioDisplay.innerHTML = `
             <div class="message-header">📝 情境</div>
             <div class="message-content">${data.scenario || '無法載入情境'}</div>
         `;
 
-        dialogueDisplay.innerHTML = '';
-        
-        if (data.response) {
-            updateDialogueDisplay("家長", data.response, data.parentAudioFilePath);
+        const { task, reminder } = getTaskAndReminder(technique, difficulty);
+        const taskDisplay = document.getElementById('taskDisplay');
+        const reminderDisplay = document.getElementById('reminderDisplay');
+        if (taskDisplay) {
+            taskDisplay.innerHTML = `<div class="message-header">老師任務</div><div class="message-content">${task}<br><br>請輸入你作為導師想對家長說的第一句話。</div>`;
+            taskDisplay.style.display = '';
+        }
+        if (reminderDisplay && reminder) {
+            reminderDisplay.innerHTML = `<div class="message-header">練習提醒</div><div class="message-content">${reminder}</div>`;
+            reminderDisplay.style.display = '';
         }
 
+        dialogueDisplay.innerHTML = '';
+
+        // 顯示對話區塊（含錄音按鈕）
+        const dialogueWithAvatar = document.getElementById('dialogueWithAvatar');
+        if (dialogueWithAvatar) dialogueWithAvatar.style.display = 'flex';
+
+        // 顯示「結束對話」按鈕
+        const actionBtns = document.getElementById('dialogueActionBtns');
+        if (actionBtns) actionBtns.style.display = 'flex';
+
+        recordStatus.textContent = difficulty === '挑戰'
+            ? '挑戰模式（5分鐘），請輸入你的第一句話。'
+            : '基礎模式（建議6輪），請輸入你的第一句話。';
+
         if (difficulty === '挑戰') {
+            totalChallengeExtension = 0;
             startCountdown();
         }
 
@@ -1341,6 +1409,31 @@ async function startDialogue(practiceId, specifiedScenario = null) {
     } finally {
         if(spinner) spinner.classList.remove('spinner-visible');
     }
+}
+
+// 結束對話按鈕
+const endDialogueBtn = document.getElementById('endDialogueBtn');
+if (endDialogueBtn) {
+    endDialogueBtn.addEventListener('click', async () => {
+        await endDialogue();
+    });
+}
+
+// 延長30秒按鈕（挑戰模式）
+const extendTimeBtn = document.getElementById('extendTimeBtn');
+if (extendTimeBtn) {
+    extendTimeBtn.addEventListener('click', () => {
+        if (totalChallengeExtension >= 60) {
+            recordStatus.textContent = '已達本次練習建議上限，建議結束對話並取得分析回饋。';
+            extendTimeBtn.style.display = 'none';
+            return;
+        }
+        totalChallengeExtension += 30;
+        countdownRemaining = 30;
+        extendTimeBtn.style.display = 'none';
+        recordStatus.textContent = '已延長30秒，請繼續對話。';
+        startCountdown();
+    });
 }
 
 // 提交文字處理
@@ -1396,11 +1489,10 @@ async function handleSubmission(text) {
         const characterVoice = getSelectedCharacterVoice();
         console.log('使用角色語音:', characterVoice);
 
-        const response = await fetch('/api/dialogue/continue-dialogue', {
+        const response = await fetchWithAuth('/api/dialogue/continue-dialogue', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 userResponse: text,
@@ -1425,30 +1517,32 @@ async function handleSubmission(text) {
             );
         }
 
-        if (difficulty === '簡單') {
-            if (data.completed && data.analysis) {
-                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-                disableUserInput();
-                await handleDialogueEnd(currentPracticeId, data.analysis);
-            } else if (data.response) {
-                updateDialogueDisplay("家長", data.response, data.audioFilePath);
-                if (dialogueCount >= 12) {
-                    disableUserInput();
-                    showEndDialogueMessage();
+        if (data.completed && data.analysis) {
+            // 後端安全上限觸發
+            analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
+            disableUserInput();
+            await handleDialogueEnd(currentPracticeId, data.analysis);
+        } else if (data.response) {
+            // 立即顯示文字，背景產生語音
+            const parentMsgId = `parent-msg-${Date.now()}`;
+            updateDialogueDisplay("家長", data.response, null, parentMsgId);
+            const ttsVoice = getSelectedCharacterVoice();
+            fetchTtsAndPlay(data.response, ttsVoice, parentMsgId);
+            enableUserInput();
+
+            const count = typeof data.turnCount === 'number' ? data.turnCount : turnProgress.count;
+            if (difficulty === '簡單') {
+                if (count >= 8) {
+                    recordStatus.textContent = '已達本次練習建議上限，建議結束對話並取得分析回饋。';
+                } else if (count >= 6) {
+                    recordStatus.textContent = '已達建議練習輪次。你可以按下「結束對話」取得分析，或再延長 1 輪。';
+                } else if (count >= 5) {
+                    recordStatus.textContent = '你可以準備統整重點、提出合作方向，並進行收尾。';
                 } else {
-                    recordStatus.textContent = `請點擊 "開始錄音" 回應下一句內容。${getTurnProgressText()}`;
-                    enableUserInput();
+                    recordStatus.textContent = `請繼續對話。${getTurnProgressText()}`;
                 }
-            }
-        } else if (difficulty === '挑戰') {
-            if (data.completed && data.analysis) {
-                analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-                disableUserInput();
-                await handleDialogueEnd(currentPracticeId, data.analysis);
-            } else if (data.response) {
-                updateDialogueDisplay("家長", data.response, data.audioFilePath);
-                recordStatus.textContent = `請點擊 "開始錄音" 回應下一句內容。${getTurnProgressText()}`;
-                enableUserInput();
+            } else {
+                recordStatus.textContent = '請繼續對話，或按下「結束對話」取得分析。';
             }
         }
 
@@ -1498,11 +1592,6 @@ startRecordBtn.addEventListener('click', async () => {
             audioChunks.push(event.data);
         };
 
-        const difficulty = difficultySelect.value;
-        if (difficulty === '挑戰' && !challengeTimer) {
-            startCountdown();
-        }
-
         mediaRecorder.onstop = async () => {
             try {
                 isRecording = false;
@@ -1521,11 +1610,9 @@ startRecordBtn.addEventListener('click', async () => {
                 formData.append('audio', audioBlob);
                 formData.append('practiceId', currentPracticeId);
 
-                const uploadResponse = await fetch('/api/audio/transcribe', {
+                const uploadResponse = await fetchWithAuth('/api/audio/transcribe', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
+                    headers: {},
                     body: formData
                 });
 
@@ -1710,16 +1797,17 @@ startPracticeBtn.addEventListener('click', async () => {
     }
 });
 
-function updateDialogueDisplay(speaker, message, audioFilePath = null) {
+function updateDialogueDisplay(speaker, message, audioFilePath = null, messageId = null) {
     if (!message || !message.trim()) return;
 
     const messageDiv = document.createElement('div');
     const speakerType = speaker.toLowerCase() === 'teacher' || speaker === '老師' ? '老師' : '家長';
     messageDiv.className = `message ${speakerType}`;
-    
+    if (messageId) messageDiv.id = messageId;
+
     const icon = speakerType === '老師' ? '👩‍🏫' : '👤';
     const alignment = speakerType === '老師' ? 'right' : 'left';
-    
+
     let messageContent = `
         <div class="message-header" style="text-align: ${alignment}">
             ${icon} ${speakerType}
@@ -1736,7 +1824,7 @@ function updateDialogueDisplay(speaker, message, audioFilePath = null) {
             ${new Date().toLocaleTimeString()}
         </div>
     `;
-    
+
     messageDiv.innerHTML = messageContent;
     
     // 動態添加樣式 (如果還沒有的話)
@@ -1774,11 +1862,45 @@ function updateDialogueDisplay(speaker, message, audioFilePath = null) {
 }
 
 function playAudio(audioFilePath) {
-    stopCurrentAudio(); 
+    stopCurrentAudio();
     currentAudioPlayer = new Audio(audioFilePath);
     currentAudioPlayer.play().catch(error => {
         console.error('播放音頻失敗:', error);
     });
+}
+
+// 背景產生 TTS，完成後自動播放並更新訊息泡泡的播放按鈕
+async function fetchTtsAndPlay(text, voice, messageId) {
+    try {
+        const res = await fetchWithAuth('/api/dialogue/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, voice })
+        });
+        const data = await res.json();
+        if (!data.success || !data.audioFilePath) return;
+
+        // 自動播放
+        playAudio(data.audioFilePath);
+
+        // 若訊息泡泡存在，補上播放按鈕
+        if (messageId) {
+            const msgDiv = document.getElementById(messageId);
+            if (msgDiv) {
+                const contentDiv = msgDiv.querySelector('.message-content');
+                if (contentDiv && !contentDiv.querySelector('.play-audio-btn')) {
+                    const btn = document.createElement('button');
+                    btn.className = 'play-audio-btn';
+                    btn.title = '播放語音';
+                    btn.textContent = '🔊 播放';
+                    btn.onclick = () => playAudio(data.audioFilePath);
+                    contentDiv.appendChild(btn);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('背景 TTS 失敗:', e);
+    }
 }
 
 function stopCurrentAudio() {
@@ -1862,6 +1984,11 @@ function addRecordingProgressElements() {
 }
 
 function startRecordingTimer() {
+    // 先清除任何殘留的錄音計時器，避免舊計時器在背景繼續跑並強制停止新錄音
+    if (recordingTimer) {
+        clearInterval(recordingTimer);
+        recordingTimer = null;
+    }
     recordingProgress = 0;
     let remainingTime = MAX_RECORDING_TIME;
     
@@ -1962,11 +2089,15 @@ function startCountdown() {
         const seconds = countdownRemaining % 60;
         if(countdownDisplay) countdownDisplay.textContent = `倒計時: ${minutes}:${seconds.toString().padStart(2, '0')}`;
 
+        if (countdownRemaining === 30) {
+            recordStatus.textContent = '請準備回應家長最後的疑問，並進行收尾。';
+        }
+
         if (countdownRemaining <= 0) {
             clearInterval(challengeTimer);
             challengeTimer = null;
             if(countdownDisplay) countdownDisplay.style.display = 'none';
-            handleChallengeEnd();
+            handleChallengeTimeUp();
         }
     }, 1000);
 }
@@ -1976,7 +2107,7 @@ function stopCountdown() {
         clearInterval(challengeTimer);
         challengeTimer = null;
     }
-    countdownRemaining = 300; 
+    countdownRemaining = 300;
 }
 
 function resetCountdown() {
@@ -1984,61 +2115,116 @@ function resetCountdown() {
         clearInterval(challengeTimer);
         challengeTimer = null;
     }
-    countdownRemaining = 300; 
+    countdownRemaining = 300;
+    totalChallengeExtension = 0;
     const countdownDisplay = document.getElementById('countdownDisplay');
     if (countdownDisplay) {
         countdownDisplay.textContent = '倒計時: 5:00';
     }
 }
 
+// 挑戰模式時間到：顯示選項，不自動分析
+function handleChallengeTimeUp() {
+    if (totalChallengeExtension >= 60) {
+        recordStatus.textContent = '已達本次練習建議上限，建議結束對話並取得分析回饋。';
+        const extendBtn = document.getElementById('extendTimeBtn');
+        if (extendBtn) extendBtn.style.display = 'none';
+    } else {
+        recordStatus.textContent = '已達建議練習時間。你可以按下「結束對話」取得分析，或延長30秒。';
+        const extendBtn = document.getElementById('extendTimeBtn');
+        if (extendBtn) extendBtn.style.display = '';
+    }
+}
 
 
-async function handleChallengeEnd() {
+
+// 手動結束對話並取得分析
+async function endDialogue() {
+    if (!currentPracticeId) {
+        recordStatus.textContent = '未找到練習 ID，請先開始練習。';
+        return;
+    }
+
+    // 顯示 loading 覆蓋
+    showAnalysisLoading(true);
+    disableUserInput();
+    stopCountdown();
+    const extendBtn = document.getElementById('extendTimeBtn');
+    if (extendBtn) extendBtn.style.display = 'none';
+
+    if (isNonverbalEnabled && window.nonverbalAnalysis) {
+        try {
+            window.nonverbalAnalysis.stop();
+            nonverbalAnalysisActive = false;
+        } catch (e) {
+            console.error('停止非語言分析失敗:', e);
+        }
+    }
+    if (nonverbalWindow) nonverbalWindow.style.display = 'none';
+
     try {
-        disableUserInput();
-        recordStatus.textContent = '挑戰模式已結束，正在分析對話...';
-
-        if (isNonverbalEnabled && window.nonverbalAnalysis) {
-            try {
-                window.nonverbalAnalysis.stop();
-                nonverbalAnalysisActive = false; // 重置狀態
-                console.log('✅ 挑戰模式結束，已停止非語言分析並重置狀態');
-            } catch (error) {
-                console.error('停止非語言分析失敗:', error);
-            }
-        }
-        if (nonverbalWindow) {
-            nonverbalWindow.style.display = 'none';
-        }
-
-        const response = await fetch('/api/dialogue/continue-dialogue', {
+        const response = await fetchWithAuth('/api/dialogue/end-dialogue', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                userResponse: "", 
-                practiceId: currentPracticeId,
-                challengeTimeOver: true,
-                
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ practiceId: currentPracticeId })
         });
 
         const data = await response.json();
-
         if (data.analysis) {
-            analysisContent.innerHTML = `<pre>${data.analysis}</pre>`;
-            await handleDialogueEnd(currentPracticeId, data.analysis);
+            // 分析已存入 DB，重載頁面後由 init 自動顯示
+            window.location.reload();
         } else {
-            analysisContent.innerHTML = '<p>未獲得分析結果，請稍後再試。</p>';
+            showAnalysisLoading(false);
+            recordStatus.textContent = '未獲得分析結果，請稍後再試。';
         }
-
-        showEndDialogueMessage();
     } catch (error) {
-        console.error('挑戰模式結束時發生錯誤:', error);
+        console.error('結束對話時發生錯誤:', error);
+        showAnalysisLoading(false);
         recordStatus.textContent = '分析失敗，請重試';
+        enableUserInput();
     }
+}
+
+function showAnalysisLoading(visible) {
+    let overlay = document.getElementById('analysisLoadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'analysisLoadingOverlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(255,255,255,0.85);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 20px;
+        `;
+        overlay.innerHTML = `
+            <div style="
+                width: 56px; height: 56px; border-radius: 50%;
+                border: 6px solid #f0d0ef;
+                border-top-color: #e93ae1;
+                animation: spin 0.9s linear infinite;
+            "></div>
+            <p style="font-size: 18px; font-weight: 600; color: #333; margin: 0;">
+                正在分析對話，請稍候...
+            </p>
+            <p style="font-size: 14px; color: #888; margin: 0;">
+                分析完成後將自動顯示結果
+            </p>
+        `;
+        if (!document.getElementById('analysisLoadingStyle')) {
+            const s = document.createElement('style');
+            s.id = 'analysisLoadingStyle';
+            s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+            document.head.appendChild(s);
+        }
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = visible ? 'flex' : 'none';
+}
+
+// 保留供舊有挑戰模式計時器呼叫（challengeTimeOver 流程）
+async function handleChallengeEnd() {
+    await endDialogue();
 }
 
 function getSelectedCharacterVoice() {
@@ -2071,11 +2257,10 @@ async function handleDialogueEnd(practiceId, analysis) {
     if (nonverbalWindow) nonverbalWindow.style.display = 'none';
 
     try {
-        await fetch(`/api/practice/practices/${practiceId}`, {
+        await fetchWithAuth(`/api/practice/practices/${practiceId}`, {
             method: 'PATCH',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ analysis }),
         });
@@ -2147,10 +2332,9 @@ function selectPracticeByTechnique(technique) {
 // API 錯誤處理檢查
 async function fixPracticeRoutes() {
     try {
-        const response = await fetch('/api/practice/practices', {
+        const response = await fetchWithAuth('/api/practice/practices', {
             method: 'GET',
             headers: { 
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -2189,9 +2373,7 @@ function isThisWeek(date, today) {
 // 錄音歷史紀錄
 async function loadRecordingsHistory(practiceId) {
     try {
-        const response = await fetch(`/api/audio/recordings?practiceId=${practiceId}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`/api/audio/recordings?practiceId=${practiceId}`);
 
         const data = await response.json();
         const recordingsList = document.getElementById('recordingsList');
@@ -2237,15 +2419,13 @@ document.getElementById('submitFeedbackBtn').addEventListener('click', async () 
       return;
     }
     
-    const token = localStorage.getItem('token');
     const practiceId = localStorage.getItem('currentPracticeId');
     
     try {
-      const response = await fetch(`/api/practice/${practiceId}/feedback`, {
+            const response = await fetchWithAuth(`/api/practice/${practiceId}/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ comment: feedbackText })
       });
@@ -2268,13 +2448,8 @@ async function loadFeedbackList(practiceId) {
     if(!feedbackList) return;
     feedbackList.innerHTML = '<p class="no-feedback">載入中...</p>';
 
-    const token = localStorage.getItem('token');
     try {
-        const response = await fetch(`/api/practice/${practiceId}/feedback`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetchWithAuth(`/api/practice/${practiceId}/feedback`);
 
         if (!response.ok) {
             const errorData = await response.json();

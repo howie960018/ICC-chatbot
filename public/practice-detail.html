@@ -421,6 +421,17 @@
                     }
                 });
 
+                if (response.status === 401) {
+                    // Token 無效/過期：清除殘留登入狀態並導回登入頁
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('currentPracticeId');
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('userRole');
+                    window.location.href = '/login';
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error('載入練習數據失敗');
                 }

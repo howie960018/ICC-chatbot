@@ -1,3 +1,9 @@
+/**
+ * Deprecated:
+ * 此檔案為舊版對話提交處理 prompt，目前未被任何路由調用。
+ * 現行對話生成請使用 routes/dialogueRoutes.js 中的 continue-dialogue prompt。
+ * 請勿再使用此 prompt，避免與基礎／挑戰模式及現行家長角色設定衝突。
+ */
 const { generateChatResponse } = require('./openaiService');
 const { 
   getDialogueState, 
